@@ -36,5 +36,48 @@
     "progress": {
       "cc": []
     }
+  },
+  {
+    "id": "ec770c9d-5836-4dd3-ba34-c836e2a2bad3",
+    "name": "João",
+    "username": "joão",
+    "registration": "2025202011",
+    "email": "lucas@gmai.com",
+    "courseId": "cc",
+    "avatarUrl": "",
+    "passwordHash": "6c78e529044bd17ce120a8e6d25ace2a:24db3656b5775e9860d470ca34da7d5754b9194059090630387c26dde0981d5fe9dbd101c101634ce24d761a03d831e5503716dfbedb01920e11b0958bc0a630",
+    "sessionToken": "74bb748f-7925-4bf8-b369-78392bdb51c1",
+    "preferences": {
+      "theme": "brand"
+    },
+    "progress": {
+      "cc": [
+        "CC101",
+        "CC202",
+        "CC102",
+        "CC201"
+      ]
+    }
+  },
+  {
+    "id": "39820515-d4db-4eb0-ba97-9a6d62cc42d0",
+    "name": "Arthur",
+    "username": "arthur",
+    "registration": "2020202020",
+    "email": "gmail@gmail.com",
+    "courseId": "cc",
+    "avatarUrl": "",
+    "passwordHash": "1320fe2f1dedc931e1425e4a0eaeeabc:c765f6c821c8b9250892b4760fcfa5d3ed5cb4a7f787a27da99ccf0c35dd8c37480489f004cd40068b1556cc5d95b8f049c8b4fe8d993acafcaac88d72ec87e2",
+    "sessionToken": "7b55bae8-3353-4874-9610-52763659a2b6",
+    "preferences": {
+      "theme": "brand"
+    },
+    "progress": {
+      "cc": [
+        "CC101",
+        "CC102",
+        "CC103"
+      ]
+    }
   }
 ]
