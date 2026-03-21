@@ -22,7 +22,7 @@ function sanitizeUser(user) {
   const fallbackUsername = String(user.name || '')
     .trim()
     .split(/\s+/)[0]
-    ?.toLowerCase() || 'usuario';
+    ?.toLowerCase() || 'usuário';
 
   return {
     id: user.id,
@@ -267,7 +267,7 @@ function validateRegistrationInput(body) {
   }
 
   if (!curriculums[courseId]) {
-    return 'Curso invalido.';
+    return 'Curso inválido.';
   }
 
   if (String(password).length < 4) {
@@ -285,19 +285,19 @@ async function validateProfileUpdate(user, body) {
   const nextTheme = String(body.theme || '').trim() || 'brand';
 
   if (nextName.length < 3) {
-    return 'Informe um nome valido.';
+    return 'Informe um nome válido.';
   }
 
   if (nextUsername.length < 3) {
-    return 'O nome de usuario deve ter pelo menos 3 caracteres.';
+    return 'O nome de usuário deve ter pelo menos 3 caracteres.';
   }
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) {
-    return 'Informe um e-mail valido.';
+    return 'Informe um e-mail válido.';
   }
 
   if (!['brand', 'dark', 'white'].includes(nextTheme)) {
-    return 'Tema invalido.';
+    return 'Tema inválido.';
   }
 
   if (nextAvatarUrl && !nextAvatarUrl.startsWith('data:image/')) {
@@ -337,7 +337,7 @@ app.post('/api/auth/register', async (req, res) => {
 
   const existingRegistration = await userRepository.findByRegistration(normalizedRegistration);
   if (existingRegistration) {
-    return res.status(409).json({ error: 'Matricula ja cadastrada.' });
+    return res.status(409).json({ error: 'Matrícula já cadastrada.' });
   }
 
   const existingEmail = await userRepository.findByEmail(normalizedEmail);
@@ -382,7 +382,7 @@ app.post('/api/auth/login', async (req, res) => {
   const user = await userRepository.findByRegistration(normalizedRegistration);
 
   if (!user || !verifyPassword(String(password), user.passwordHash)) {
-    return res.status(401).json({ error: 'Credenciais invalidas.' });
+    return res.status(401).json({ error: 'Credenciais inválidas.' });
   }
 
   const sessionToken = crypto.randomUUID();
@@ -416,7 +416,7 @@ app.get('/api/auth/me', async (req, res) => {
   const user = await getAuthenticatedUser(req);
 
   if (!user) {
-    return res.status(401).json({ error: 'Sessao invalida.' });
+    return res.status(401).json({ error: 'Sessão inválida.' });
   }
 
   return res.json({ user: sanitizeUser(user) });
@@ -426,7 +426,7 @@ app.patch('/api/profile', async (req, res) => {
   const user = await getAuthenticatedUser(req);
 
   if (!user) {
-    return res.status(401).json({ error: 'Sessao invalida.' });
+    return res.status(401).json({ error: 'Sessão inválida.' });
   }
 
   const validationError = await validateProfileUpdate(user, req.body);
@@ -455,7 +455,7 @@ app.get('/api/map', async (req, res) => {
   const user = await getAuthenticatedUser(req);
 
   if (!user) {
-    return res.status(401).json({ error: 'Sessao invalida.' });
+    return res.status(401).json({ error: 'Sessão inválida.' });
   }
 
   return res.json(buildMapPayload(user, req.query.courseId));
@@ -465,7 +465,7 @@ app.post('/api/progress/toggle', async (req, res) => {
   const user = await getAuthenticatedUser(req);
 
   if (!user) {
-    return res.status(401).json({ error: 'Sessao invalida.' });
+    return res.status(401).json({ error: 'Sessão inválida.' });
   }
 
   const { courseId, subjectId, completed } = req.body;
@@ -474,7 +474,7 @@ app.post('/api/progress/toggle', async (req, res) => {
   const targetSubject = curriculum.subjects.find((subject) => subject.id === subjectId);
 
   if (!targetSubject) {
-    return res.status(404).json({ error: 'Disciplina nao encontrada.' });
+    return res.status(404).json({ error: 'Disciplina não encontrada.' });
   }
 
   const currentProgress = new Set(user.progress?.[selectedCourseId] || []);
@@ -484,7 +484,7 @@ app.post('/api/progress/toggle', async (req, res) => {
     const prerequisitesReady = targetSubject.prerequisites.every((prerequisiteId) => currentProgress.has(prerequisiteId));
 
     if (!prerequisitesReady) {
-      return res.status(400).json({ error: 'Pre-requisitos ainda nao concluidos.' });
+      return res.status(400).json({ error: 'Pré-requisitos ainda não concluídos.' });
     }
 
     currentProgress.add(subjectId);
@@ -495,7 +495,7 @@ app.post('/api/progress/toggle', async (req, res) => {
 
     if (dependentCompleted.length > 0) {
       return res.status(400).json({
-        error: `Nao e possivel desfazer esta disciplina enquanto ${dependentCompleted.join(', ')} estiver concluida.`,
+        error: `Não é possível desfazer esta disciplina enquanto ${dependentCompleted.join(', ')} estiver concluída.`,
       });
     }
 
@@ -514,16 +514,16 @@ app.post('/api/progress/toggle', async (req, res) => {
 });
 
 app.use('/api', (req, res) => {
-  return res.status(404).json({ error: 'Rota da API nao encontrada.' });
+  return res.status(404).json({ error: 'Rota da API não encontrada.' });
 });
 
 app.use((error, req, res, next) => {
   if (error?.type === 'entity.too.large') {
-    return res.status(413).json({ error: 'A imagem enviada e grande demais. Use uma foto menor.' });
+    return res.status(413).json({ error: 'A imagem enviada é grande demais. Use uma foto menor.' });
   }
 
   if (error instanceof SyntaxError && 'body' in error) {
-    return res.status(400).json({ error: 'Requisicao invalida.' });
+    return res.status(400).json({ error: 'Requisição inválida.' });
   }
 
   return next(error);

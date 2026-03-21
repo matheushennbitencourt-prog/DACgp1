@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { startTransition, useDeferredValue, useEffect, useState } from 'react';
 import './App.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -6,9 +6,9 @@ const API_FALLBACK_URL = 'http://localhost:3001/api';
 const TOKEN_STORAGE_KEY = 'coursemapper_token';
 const THEME_STORAGE_KEY = 'coursemapper_theme';
 
-const statusLabels = { completed: 'Concluida', available: 'Disponivel', locked: 'Bloqueada' };
+const statusLabels = { completed: 'Concluída', available: 'Disponível', locked: 'Bloqueada' };
 const statusOrder = { completed: 0, available: 1, locked: 2 };
-const pageLabels = { overview: 'Visao geral', board: 'Quadro de cadeiras', curriculum: 'Curriculo', analytics: 'Analises', settings: 'Configuracoes' };
+const pageLabels = { overview: 'Visão geral', board: 'Quadro de cadeiras', curriculum: 'Currículo', analytics: 'Análises', settings: 'Configurações' };
 const themeOptions = [{ id: 'brand', label: 'Verde' }, { id: 'dark', label: 'Dark' }, { id: 'white', label: 'White' }];
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -36,7 +36,7 @@ async function parseApiResponse(response) {
     throw new Error('A API retornou HTML em vez de JSON. Reinicie o backend para carregar as rotas mais recentes.');
   }
 
-  throw new Error(text || 'Resposta invalida da API.');
+  throw new Error(text || 'Resposta inválida da API.');
 }
 
 async function apiRequest(path, options = {}, token = '') {
@@ -96,18 +96,18 @@ function formatRegistration(value) {
 
 function validateAuthForm(authMode, form) {
   const registration = normalizeRegistration(form.registration);
-  if (authMode === 'register' && form.name.trim().length < 3) return 'Informe um nome valido.';
-  if (registration.length !== 10) return 'A matricula deve ter 10 digitos.';
-  if (authMode === 'register' && !EMAIL_PATTERN.test(form.email.trim())) return 'Informe um e-mail valido.';
+  if (authMode === 'register' && form.name.trim().length < 3) return 'Informe um nome válido.';
+  if (registration.length !== 10) return 'A matrícula deve ter 10 dígitos.';
+  if (authMode === 'register' && !EMAIL_PATTERN.test(form.email.trim())) return 'Informe um e-mail válido.';
   if (form.password.trim().length < 4) return 'A senha deve ter pelo menos 4 caracteres.';
   return '';
 }
 
 function validateSettingsForm(form) {
-  if (form.name.trim().length < 3) return 'Informe um nome valido.';
-  if (form.username.trim().length < 3) return 'O nome de usuario deve ter pelo menos 3 caracteres.';
-  if (!EMAIL_PATTERN.test(form.email.trim())) return 'Informe um e-mail valido.';
-  if (!themeOptions.some((option) => option.id === form.theme)) return 'Tema invalido.';
+  if (form.name.trim().length < 3) return 'Informe um nome válido.';
+  if (form.username.trim().length < 3) return 'O nome de usuário deve ter pelo menos 3 caracteres.';
+  if (!EMAIL_PATTERN.test(form.email.trim())) return 'Informe um e-mail válido.';
+  if (!themeOptions.some((option) => option.id === form.theme)) return 'Tema inválido.';
   return '';
 }
 
@@ -268,11 +268,11 @@ function AuthScreen({ authMode, form, setForm, onSubmit, setAuthMode, loading, e
       <section className="auth-hero">
         <div className="auth-badge">DACathon 2026</div>
         <h1>CourseMapper</h1>
-        <p className="auth-copy">Um painel academico mais calmo, visual e objetivo para acompanhar disciplinas, trilhas, progresso e o caminho critico do curso.</p>
+        <p className="auth-copy">Um painel acadêmico mais calmo, visual e objetivo para acompanhar disciplinas, trilhas, progresso e o caminho crítico do curso.</p>
         <div className="auth-panels">
-          <article><span className="panel-kicker">Organizacao</span><strong>Visao clara por semestre</strong><p>Menos ruido visual e mais foco no que desbloqueia sua proxima etapa.</p></article>
-          <article><span className="panel-kicker">Planejamento</span><strong>Analises de progresso</strong><p>Percentual concluido, materias liberadas e leitura do caminho critico.</p></article>
-          <article><span className="panel-kicker">Perfil</span><strong>Configuracoes pessoais</strong><p>Depois do login voce consegue editar foto, dados do perfil e tema do site.</p></article>
+          <article><span className="panel-kicker">Organização</span><strong>Visão clara por semestre</strong><p>Menos ruído visual e mais foco no que desbloqueia sua próxima etapa.</p></article>
+          <article><span className="panel-kicker">Planejamento</span><strong>Análises de progresso</strong><p>Percentual concluído, matérias liberadas e leitura do caminho crítico.</p></article>
+          <article><span className="panel-kicker">Perfil</span><strong>Configurações pessoais</strong><p>Depois do login você consegue editar foto, dados do perfil e tema do site.</p></article>
         </div>
       </section>
       <section className="auth-card">
@@ -282,7 +282,7 @@ function AuthScreen({ authMode, form, setForm, onSubmit, setAuthMode, loading, e
               <input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Lucas Oliveira" />
             </label>
           ) : null}
-          <label>Matricula
+          <label>Matrícula
             <input value={form.registration} onChange={(event) => setForm((current) => ({ ...current, registration: formatRegistration(event.target.value) }))} placeholder="2026 000001" inputMode="numeric" maxLength={11} />
           </label>
           {authMode === 'register' ? (
@@ -291,7 +291,7 @@ function AuthScreen({ authMode, form, setForm, onSubmit, setAuthMode, loading, e
             </label>
           ) : null}
           <label>Senha
-            <input type="password" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} placeholder="Minimo de 4 caracteres" minLength={4} autoComplete={authMode === 'login' ? 'current-password' : 'new-password'} />
+            <input type="password" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} placeholder="Mínimo de 4 caracteres" minLength={4} autoComplete={authMode === 'login' ? 'current-password' : 'new-password'} />
           </label>
           {authMode === 'register' ? (
             <label>Curso
@@ -318,19 +318,19 @@ function Sidebar({ user, currentPage, setCurrentPage, selectedCourseId, setSelec
     <aside className="sidebar">
       <div className="sidebar-block">
         <div className="brand-mark">CM</div>
-        <div><p className="sidebar-label">Painel academico</p><h2>CourseMapper</h2></div>
+        <div><p className="sidebar-label">Painel acadêmico</p><h2>CourseMapper</h2></div>
       </div>
       <div className="sidebar-block">
-        <p className="sidebar-label">Navegacao</p>
+        <p className="sidebar-label">Navegação</p>
         <div className="nav-list">
           {Object.entries(pageLabels).map(([page, label]) => (
-            <button key={page} type="button" className={`nav-button ${currentPage === page ? 'is-active' : ''}`} onClick={() => setCurrentPage(page)}>{label}</button>
+            <button key={page} type="button" className={`nav-button ${currentPage === page ? 'is-active' : ''}`} onClick={() => startTransition(() => setCurrentPage(page))}>{label}</button>
           ))}
         </div>
       </div>
       <div className="sidebar-block">
-        <p className="sidebar-label">Curriculo</p>
-        <select className="sidebar-select" value={selectedCourseId} onChange={(event) => setSelectedCourseId(event.target.value)}>
+        <p className="sidebar-label">Currículo</p>
+        <select className="sidebar-select" value={selectedCourseId} onChange={(event) => startTransition(() => setSelectedCourseId(event.target.value))}>
           {curriculums.map((curriculum) => <option key={curriculum.id} value={curriculum.id}>{curriculum.name}</option>)}
         </select>
         <div className="tag-list">
@@ -360,41 +360,41 @@ function OverviewPage({ mapData, user, curriculums, setCurrentPage }) {
     <div className="page-grid">
       <section className="hero-card">
         <div className="hero-content">
-          <p className="section-kicker">Visao geral</p>
-          <h1>Bom ver voce por aqui, {user.name.split(' ')[0]}.</h1>
-          <p>Seu curso padrao e <strong>{userCourse?.name}</strong>. O painel abaixo resume o seu momento academico e mostra o que merece mais atencao agora.</p>
+          <p className="section-kicker">Visão geral</p>
+          <h1>Bom ver você por aqui, {user.name.split(' ')[0]}.</h1>
+          <p>Seu curso padrão é <strong>{userCourse?.name}</strong>. O painel abaixo resume o seu momento acadêmico e mostra o que merece mais atenção agora.</p>
           <div className="hero-actions">
-            <button type="button" className="primary-button" onClick={() => setCurrentPage('curriculum')}>Ver curriculo completo</button>
-            <button type="button" className="soft-button" onClick={() => setCurrentPage('settings')}>Abrir configuracoes</button>
+            <button type="button" className="primary-button" onClick={() => startTransition(() => setCurrentPage('curriculum'))}>Ver currículo completo</button>
+            <button type="button" className="soft-button" onClick={() => startTransition(() => setCurrentPage('settings'))}>Abrir configurações</button>
           </div>
         </div>
       </section>
       <section className="stats-strip">
-        <article className="metric-card"><span>Conclusao</span><strong>{mapData.stats.completionRate}%</strong></article>
-        <article className="metric-card"><span>Concluidas</span><strong>{mapData.stats.completedCount}</strong></article>
-        <article className="metric-card"><span>Disponiveis</span><strong>{mapData.stats.availableCount}</strong></article>
+        <article className="metric-card"><span>Conclusão</span><strong>{mapData.stats.completionRate}%</strong></article>
+        <article className="metric-card"><span>Concluídas</span><strong>{mapData.stats.completedCount}</strong></article>
+        <article className="metric-card"><span>Disponíveis</span><strong>{mapData.stats.availableCount}</strong></article>
         <article className="metric-card"><span>Semestres restantes</span><strong>{mapData.stats.remainingCriticalSemesters}</strong></article>
       </section>
       <section className="content-grid two-columns">
         <article className="surface-card">
-          <div className="card-heading"><div><p className="section-kicker">Proximos passos</p><h3>Disciplinas prontas para cursar</h3></div></div>
+          <div className="card-heading"><div><p className="section-kicker">Próximos passos</p><h3>Disciplinas prontas para cursar</h3></div></div>
           <div className="stack-list">
             {availableSubjects.map((subject) => (
               <div key={subject.id} className="list-row">
                 <div><strong>{subject.name}</strong><p>{subject.id} • {subject.trail}</p></div>
-                <span className="status-pill available">Disponivel</span>
+                <span className="status-pill available">Disponível</span>
               </div>
             ))}
             {availableSubjects.length === 0 ? <p className="empty-copy">Nenhuma disciplina liberada agora.</p> : null}
           </div>
         </article>
         <article className="surface-card">
-          <div className="card-heading"><div><p className="section-kicker">Caminho critico</p><h3>Materias que puxam o plano</h3></div></div>
+          <div className="card-heading"><div><p className="section-kicker">Caminho crítico</p><h3>Matérias que puxam o plano</h3></div></div>
           <div className="stack-list">
             {criticalSubjects.map((subject) => (
               <div key={subject.id} className="list-row">
                 <div><strong>{subject.name}</strong><p>{subject.id} • {statusLabels[subject.status]}</p></div>
-                <span className="critical-chip">Critico</span>
+                <span className="critical-chip">Crítico</span>
               </div>
             ))}
           </div>
@@ -410,16 +410,16 @@ function CurriculumPage({ mapData, actionLoadingId, onToggleSubject }) {
   return (
     <div className="page-grid">
       <section className="page-header-card">
-        <p className="section-kicker">Curriculo</p>
+        <p className="section-kicker">Currículo</p>
         <h1>{mapData.course.name}</h1>
-        <p>Uma leitura limpa por semestre, com estados visuais discretos e destaque para o que esta mais perto de destravar o curso.</p>
+        <p>Uma leitura limpa por semestre, com estados visuais discretos e destaque para o que está mais perto de destravar o curso.</p>
       </section>
       <section className="semester-grid refined">
         {orderedSemesters.map((semester) => (
           <article key={semester} className="surface-card semester-surface">
             <div className="card-heading">
-              <div><p className="section-kicker">Semestre</p><h3>{semester}o periodo</h3></div>
-              <span className="small-counter">{groupedSubjects[semester].length} materias</span>
+              <div><p className="section-kicker">Semestre</p><h3>{semester}º período</h3></div>
+              <span className="small-counter">{groupedSubjects[semester].length} matérias</span>
             </div>
             <div className="subject-list">
               {groupedSubjects[semester].map((subject) => (
@@ -587,29 +587,29 @@ function AnalyticsPage({ mapData }) {
   return (
     <div className="page-grid">
       <section className="page-header-card">
-        <p className="section-kicker">Analises</p>
+        <p className="section-kicker">Análises</p>
         <h1>Leitura do progresso</h1>
-        <p>Um retrato rapido do que ja foi concluido, das trilhas mais fortes e do quanto ainda falta para terminar o caminho principal.</p>
+        <p>Um retrato rápido do que já foi concluído, das trilhas mais fortes e do quanto ainda falta para terminar o caminho principal.</p>
       </section>
       <section className="content-grid two-columns">
         <article className="surface-card progress-card">
-          <div className="card-heading"><div><p className="section-kicker">Ritmo geral</p><h3>Conclusao do curso</h3></div></div>
-          <div className="progress-ring" style={{ '--progress-value': `${completion}%` }}><div className="progress-ring-inner"><strong>{completion}%</strong><span>concluido</span></div></div>
-          <p className="support-copy">{mapData.stats.completedCount} de {mapData.stats.totalSubjects} disciplinas concluidas.</p>
+          <div className="card-heading"><div><p className="section-kicker">Ritmo geral</p><h3>Conclusão do curso</h3></div></div>
+          <div className="progress-ring" style={{ '--progress-value': `${completion}%` }}><div className="progress-ring-inner"><strong>{completion}%</strong><span>concluído</span></div></div>
+          <p className="support-copy">{mapData.stats.completedCount} de {mapData.stats.totalSubjects} disciplinas concluídas.</p>
         </article>
         <article className="surface-card">
           <div className="card-heading"><div><p className="section-kicker">Estimativa</p><h3>Tempo restante</h3></div></div>
           <div className="timeline-callout"><strong>{mapData.stats.remainingCriticalSemesters}</strong><span>semestres no caminho critico</span></div>
-          <p className="support-copy">Considerando que todas as disciplinas abrem em todos os semestres, este numero ajuda a enxergar o minimo teorico para concluir o fluxo principal.</p>
+          <p className="support-copy">Considerando que todas as disciplinas abrem em todos os semestres, este número ajuda a enxergar o mínimo teórico para concluir o fluxo principal.</p>
         </article>
       </section>
       <section className="surface-card">
-        <div className="card-heading"><div><p className="section-kicker">Trilhas</p><h3>Distribuicao por area</h3></div></div>
+        <div className="card-heading"><div><p className="section-kicker">Trilhas</p><h3>Distribuição por área</h3></div></div>
         <div className="trail-grid">
           {trailSummary.map((item) => (
             <article key={item.trail} className="trail-card">
               <strong>{item.trail}</strong>
-              <span>{item.completed}/{item.total} concluidas</span>
+              <span>{item.completed}/{item.total} concluídas</span>
               <div className="mini-bar"><div style={{ width: `${item.completionRate}%` }} /></div>
               <p>{item.completionRate}% de aproveitamento nesta trilha</p>
             </article>
@@ -646,9 +646,9 @@ function SettingsPage({
   return (
     <div className="page-grid">
       <section className="page-header-card">
-        <p className="section-kicker">Configuracoes</p>
-        <h1>Seu perfil e preferencias</h1>
-        <p>Atualize sua foto, nome de usuario, dados da conta e o tema do site em um unico lugar.</p>
+        <p className="section-kicker">Configurações</p>
+        <h1>Seu perfil e preferências</h1>
+        <p>Atualize sua foto, nome de usuário, dados da conta e o tema do site em um único lugar.</p>
       </section>
       <section className="content-grid two-columns settings-layout">
         <article className="surface-card">
@@ -656,7 +656,7 @@ function SettingsPage({
           <div className="settings-avatar-block">
             <Avatar user={{ name: settingsForm.name || user.name, avatarUrl: settingsForm.avatarUrl }} large />
             <div className="settings-avatar-copy">
-              <strong>Imagem do usuario</strong>
+              <strong>Imagem do usuário</strong>
               <p>Envie uma imagem do seu dispositivo para personalizar o painel com mais estabilidade.</p>
               <div className="settings-avatar-actions">
                 <label className="upload-button">Escolher imagem<input type="file" accept="image/*" onChange={handleAvatarChange} /></label>
@@ -673,7 +673,7 @@ function SettingsPage({
           </div>
         </article>
         <article className="surface-card">
-          <div className="card-heading"><div><p className="section-kicker">Tema</p><h3>Aparencia do site</h3></div></div>
+          <div className="card-heading"><div><p className="section-kicker">Tema</p><h3>Aparência do site</h3></div></div>
           <ThemeControl
             theme={settingsForm.theme}
             setTheme={(nextTheme) => {
@@ -687,12 +687,12 @@ function SettingsPage({
         <div className="card-heading"><div><p className="section-kicker">Dados pessoais</p><h3>Editar perfil</h3></div></div>
         <form className="settings-form" onSubmit={onSaveProfile}>
           <label>Nome completo<input value={settingsForm.name} onChange={(event) => setSettingsForm((current) => ({ ...current, name: event.target.value }))} /></label>
-          <label>Nome de usuario<input value={settingsForm.username} onChange={(event) => setSettingsForm((current) => ({ ...current, username: event.target.value.replace(/\s+/g, '') }))} /></label>
+          <label>Nome de usuário<input value={settingsForm.username} onChange={(event) => setSettingsForm((current) => ({ ...current, username: event.target.value.replace(/\s+/g, '') }))} /></label>
           <label>E-mail<input type="email" value={settingsForm.email} onChange={(event) => setSettingsForm((current) => ({ ...current, email: event.target.value }))} /></label>
-          <label>Matricula<input value={formatRegistration(user.registration)} disabled /></label>
+          <label>Matrícula<input value={formatRegistration(user.registration)} disabled /></label>
           {settingsError ? <p className="form-error">{settingsError}</p> : null}
           {settingsSuccess ? <p className="form-success">{settingsSuccess}</p> : null}
-          <div className="settings-actions"><button type="submit" className="primary-button" disabled={settingsLoading || !hasSettingsChanges}>{settingsLoading ? 'Salvando...' : 'Salvar configuracoes'}</button></div>
+          <div className="settings-actions"><button type="submit" className="primary-button" disabled={settingsLoading || !hasSettingsChanges}>{settingsLoading ? 'Salvando...' : 'Salvar configurações'}</button></div>
         </form>
       </section>
     </div>
@@ -720,23 +720,30 @@ function Dashboard({
   hasSettingsChanges,
 }) {
   const [currentPage, setCurrentPage] = useState('overview');
+  const deferredMapData = useDeferredValue(mapData);
   let pageContent = null;
 
-  if (mapData) {
+  useEffect(() => {
+    document.title = currentPage === 'overview'
+      ? 'CourseMapper'
+      : `${pageLabels[currentPage]} | CourseMapper`;
+  }, [currentPage]);
+
+  if (deferredMapData) {
     if (currentPage === 'overview') {
-      pageContent = <OverviewPage mapData={mapData} user={user} curriculums={curriculums} setCurrentPage={setCurrentPage} />;
+      pageContent = <OverviewPage mapData={deferredMapData} user={user} curriculums={curriculums} setCurrentPage={setCurrentPage} />;
     }
 
     if (currentPage === 'curriculum') {
-      pageContent = <CurriculumPage mapData={mapData} actionLoadingId={actionLoadingId} onToggleSubject={onToggleSubject} />;
+      pageContent = <CurriculumPage mapData={deferredMapData} actionLoadingId={actionLoadingId} onToggleSubject={onToggleSubject} />;
     }
 
     if (currentPage === 'board') {
-      pageContent = <BoardPage mapData={mapData} actionLoadingId={actionLoadingId} onToggleSubject={onToggleSubject} />;
+      pageContent = <BoardPage mapData={deferredMapData} actionLoadingId={actionLoadingId} onToggleSubject={onToggleSubject} />;
     }
 
     if (currentPage === 'analytics') {
-      pageContent = <AnalyticsPage mapData={mapData} />;
+      pageContent = <AnalyticsPage mapData={deferredMapData} />;
     }
 
     if (currentPage === 'settings') {
@@ -765,13 +772,13 @@ function Dashboard({
         selectedCourseId={selectedCourseId}
         setSelectedCourseId={setSelectedCourseId}
         curriculums={curriculums}
-        mapData={mapData}
+        mapData={deferredMapData}
         onLogout={onLogout}
       />
       <main className="dashboard-main">
         <header className="main-header">
           <div><p className="section-kicker">Workspace</p><h1>{pageLabels[currentPage]}</h1></div>
-          <div className="header-meta"><span>{mapData?.course.code || '--'}</span><span>{mapData?.stats.completionRate ?? 0}% concluido</span></div>
+          <div className="header-meta"><span>{mapData?.course.code || '--'}</span><span>{mapData?.stats.completionRate ?? 0}% concluído</span></div>
         </header>
         {dashboardError ? <p className="banner-error">{dashboardError}</p> : null}
         {mapLoading ? <p className="loading-copy">Carregando painel...</p> : pageContent}
@@ -962,7 +969,7 @@ export default function App() {
       setUser(response.user);
       setTheme(response.user.preferences?.theme || settingsForm.theme);
       setSettingsForm(getSettingsForm(response.user, response.user.preferences?.theme || settingsForm.theme));
-      setSettingsSuccess('Configuracoes salvas com sucesso.');
+      setSettingsSuccess('Configurações salvas com sucesso.');
     } catch (error) {
       setSettingsError(error.message);
     } finally {
@@ -971,7 +978,7 @@ export default function App() {
   }
 
   if (loading) {
-    return <div className="screen-message">Preparando sua area academica...</div>;
+    return <div className="screen-message">Preparando sua área acadêmica...</div>;
   }
 
   if (!user) {
