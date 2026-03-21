@@ -17,6 +17,7 @@ const setStoredToken = (token) => token ? window.localStorage.setItem(TOKEN_STOR
 const getStoredTheme = () => window.localStorage.getItem(THEME_STORAGE_KEY) || 'brand';
 const setStoredTheme = (theme) => window.localStorage.setItem(THEME_STORAGE_KEY, theme);
 const getDefaultUsername = (name) => String(name || '').trim().split(/\s+/)[0]?.toLowerCase() || 'usuario';
+const shouldUseLocalApiFallback = () => ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
 async function parseApiResponse(response) {
   if (response.status === 204) {
@@ -58,6 +59,7 @@ async function apiRequest(path, options = {}, token = '') {
   } catch (error) {
     const shouldRetryWithFallback =
       API_BASE_URL === '/api' &&
+      shouldUseLocalApiFallback() &&
       error instanceof Error &&
       error.message === 'A API retornou HTML em vez de JSON.';
 

@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: coursemapper-api
+    runtime: node
+    rootDir: .
+    buildCommand: npm install
+    startCommand: node backend/server.cjs
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: STORAGE_DRIVER
+        value: file
