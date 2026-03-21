@@ -529,13 +529,42 @@ app.use((error, req, res, next) => {
   return next(error);
 });
 
-userRepository.init()
-  .then(() => {
-    app.listen(config.port, () => {
-      console.log(`CourseMapper backend ativo em http://localhost:${config.port}`);
+async function startServer(port = config.port) {
+  await userRepository.init();
+
+  return new Promise((resolve, reject) => {
+    const server = app.listen(port, () => {
+      resolve(server);
     });
-  })
-  .catch((error) => {
-    console.error('Falha ao iniciar o backend:', error);
-    process.exit(1);
+
+    server.on('error', reject);
   });
+}
+
+if (require.main === module) {
+  startServer()
+    .then(() => {
+      console.log(`CourseMapper backend ativo em http://localhost:${config.port}`);
+    })
+    .catch((error) => {
+      console.error('Falha ao iniciar o backend:', error);
+      process.exit(1);
+    });
+}
+
+module.exports = {
+  app,
+  startServer,
+  sanitizeUser,
+  hashPassword,
+  verifyPassword,
+  buildCurriculumSummary,
+  buildChildrenMap,
+  collectDependentSubjects,
+  createDepthCalculator,
+  getCriticalPath,
+  countRemainingChain,
+  buildMapPayload,
+  validateRegistrationInput,
+  validateProfileUpdate,
+};
