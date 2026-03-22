@@ -4,7 +4,7 @@ create table if not exists users (
   username text not null default '',
   registration text not null unique,
   email text not null unique,
-  course_id text not null check (course_id in ('cc', 'si')),
+  course_id text not null,
   avatar_url text not null default '',
   password_hash text not null,
   session_token text,
@@ -15,11 +15,25 @@ create table if not exists users (
 
 create table if not exists user_progress (
   user_id uuid not null references users(id) on delete cascade,
-  course_id text not null check (course_id in ('cc', 'si')),
+  course_id text not null,
   subject_id text not null,
   created_at timestamptz not null default now(),
   primary key (user_id, course_id, subject_id)
 );
 
+alter table users drop constraint if exists users_course_id_check;
+alter table user_progress drop constraint if exists user_progress_course_id_check;
+
+create table if not exists imported_curriculums (
+  id text primary key,
+  code text not null,
+  name text not null,
+  trail_labels jsonb not null default '[]'::jsonb,
+  subjects jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists idx_users_session_token on users(session_token);
 create index if not exists idx_user_progress_user_course on user_progress(user_id, course_id);
+create index if not exists idx_imported_curriculums_name on imported_curriculums(name);

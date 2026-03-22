@@ -1144,6 +1144,22 @@
   font-size: 0.9rem;
 }
 
+.settings-form textarea {
+  min-height: 180px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 13px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.settings-textarea-field {
+  grid-column: 1 / -1;
+}
+
 .settings-actions {
   grid-column: 1 / -1;
   display: flex;

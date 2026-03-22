@@ -61,16 +61,42 @@ function createSeedUser(progress = { cc: ['CC101', 'CC102'] }) {
   }
 }
 
+function createInMemoryCurriculumRepository(seedCurriculums = []) {
+  const curriculums = [...seedCurriculums]
+
+  return {
+    async init() {},
+    async list() {
+      return [...curriculums]
+    },
+    async findById(id) {
+      return curriculums.find((curriculum) => curriculum.id === id) || null
+    },
+    async upsert(curriculum) {
+      const index = curriculums.findIndex((item) => item.id === curriculum.id)
+      if (index === -1) {
+        curriculums.push(curriculum)
+      } else {
+        curriculums[index] = curriculum
+      }
+      return curriculum
+    },
+  }
+}
+
 describe('backend app routes', () => {
   let repo
+  let curriculumRepository
   let app
 
   beforeEach(() => {
     repo = createInMemoryUserRepository([createSeedUser()])
+    curriculumRepository = createInMemoryCurriculumRepository()
 
     app = createApp({
+      curriculumRepository,
       userRepository: repo,
-      config: { storageDriver: 'file' },
+      config: { storageDriver: 'file', openaiApiKey: '' },
       emailDomainValidator: async () => true,
     })
   })
@@ -174,8 +200,9 @@ describe('backend app routes', () => {
     ])
 
     app = createApp({
+      curriculumRepository,
       userRepository: repo,
-      config: { storageDriver: 'file' },
+      config: { storageDriver: 'file', openaiApiKey: '' },
       emailDomainValidator: async () => true,
     })
 
@@ -190,5 +217,27 @@ describe('backend app routes', () => {
 
     expect(response.status).toBe(400)
     expect(response.body.error).toContain('CC301')
+  })
+
+  it('importa uma grade em JSON e a devolve na lista de curriculos', async () => {
+    const response = await request(app)
+      .post('/api/curriculums/import')
+      .set('Authorization', 'Bearer token-1')
+      .send({
+        fileName: 'grade-importada.json',
+        sourceText: JSON.stringify({
+          code: 'ADS',
+          name: 'Analise e Desenvolvimento de Sistemas',
+          trailLabels: ['Backend', 'Frontend'],
+          subjects: [
+            { id: 'ADS101', name: 'Algoritmos', semester: 1, trail: 'Base', prerequisites: [], corequisites: [] },
+            { id: 'ADS201', name: 'APIs Web', semester: 2, trail: 'Backend', prerequisites: ['ADS101'], corequisites: [] },
+          ],
+        }),
+      })
+
+    expect(response.status).toBe(201)
+    expect(response.body.curriculum.name).toContain('Analise')
+    expect(response.body.curriculums.some((curriculum) => curriculum.code === 'ADS')).toBe(true)
   })
 })

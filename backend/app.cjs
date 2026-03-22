@@ -6,8 +6,9 @@ const crypto = require('crypto');
 const compression = require('compression');
 
 const defaultConfig = require('./config.cjs');
-const { createUserRepository } = require('./repositories/index.cjs');
-const { createCurriculumCatalog } = require('./services/curriculumCatalog.cjs');
+const { createCurriculumRepository, createUserRepository } = require('./repositories/index.cjs');
+const { createCurriculumCatalog, mergeCurriculumSources } = require('./services/curriculumCatalog.cjs');
+const { parseCurriculumSource } = require('./services/curriculumImportService.cjs');
 const { buildMapPayload: buildMapPayloadFromCatalog } = require('./services/mapService.cjs');
 const { toggleSubjectProgress } = require('./services/progressService.cjs');
 const {
@@ -18,16 +19,6 @@ const {
   normalizeEmail,
   verifyPassword,
 } = require('./security.cjs');
-
-const curriculumCatalog = createCurriculumCatalog();
-
-function buildMapPayload(user, selectedCourseId) {
-  return buildMapPayloadFromCatalog(user, selectedCourseId, curriculumCatalog);
-}
-
-function buildCurriculumSummary() {
-  return curriculumCatalog.getSummaryList();
-}
 
 function sanitizeUser(user) {
   const fallbackUsername = String(user.name || '')
@@ -60,6 +51,7 @@ function getTokenFromRequest(req) {
 }
 
 function createApp({
+  curriculumRepository = createCurriculumRepository(),
   userRepository = createUserRepository(),
   config = defaultConfig,
   emailDomainValidator = hasResolvableEmailDomain,
@@ -73,6 +65,21 @@ function createApp({
   app.use(compression({ threshold: '2kb' }));
   app.use(express.json({ limit: '8mb' }));
 
+  async function getCurriculumCatalog() {
+    const importedCurriculums = await curriculumRepository.list();
+    return createCurriculumCatalog(mergeCurriculumSources(importedCurriculums));
+  }
+
+  async function buildMapPayload(user, selectedCourseId) {
+    const curriculumCatalog = await getCurriculumCatalog();
+    return buildMapPayloadFromCatalog(user, selectedCourseId, curriculumCatalog);
+  }
+
+  async function buildCurriculumSummary() {
+    const curriculumCatalog = await getCurriculumCatalog();
+    return curriculumCatalog.getSummaryList();
+  }
+
   async function getAuthenticatedUser(req) {
     const token = getTokenFromRequest(req);
 
@@ -85,6 +92,7 @@ function createApp({
 
   async function validateRegistrationInput(body) {
     const { name, registration, email, password, courseId } = body;
+    const curriculumCatalog = await getCurriculumCatalog();
 
     if (!name || !registration || !email || !password || !courseId) {
       return 'Preencha todos os campos.';
@@ -158,7 +166,47 @@ function createApp({
   });
 
   app.get('/api/curriculums', (req, res) => {
-    res.json(buildCurriculumSummary());
+    buildCurriculumSummary()
+      .then((summary) => {
+        res.json(summary);
+      })
+      .catch((error) => {
+        res.status(500).json({ error: error.message || 'Falha ao carregar curriculos.' });
+      });
+  });
+
+  app.post('/api/curriculums/import', async (req, res) => {
+    const user = await getAuthenticatedUser(req);
+
+    if (!user) {
+      return res.status(401).json({ error: 'Sessao invalida.' });
+    }
+
+    const sourceText = String(req.body.sourceText || '').trim();
+    const fileName = String(req.body.fileName || '').trim();
+
+    if (!sourceText) {
+      return res.status(400).json({ error: 'Envie o conteudo da grade curricular.' });
+    }
+
+    try {
+      const curriculum = await parseCurriculumSource({
+        fileName,
+        openaiApiKey: config.openaiApiKey,
+        openaiModel: config.openaiModel,
+        sourceText,
+      });
+
+      await curriculumRepository.upsert(curriculum);
+      const summary = await buildCurriculumSummary();
+
+      return res.status(201).json({
+        curriculum,
+        curriculums: summary,
+      });
+    } catch (error) {
+      return res.status(400).json({ error: error.message || 'Falha ao importar a grade curricular.' });
+    }
   });
 
   app.post('/api/auth/register', async (req, res) => {
@@ -295,11 +343,12 @@ function createApp({
       return res.status(401).json({ error: 'Sessao invalida.' });
     }
 
-    return res.json(buildMapPayload(user, req.query.courseId));
+    return res.json(await buildMapPayload(user, req.query.courseId));
   });
 
   app.post('/api/progress/toggle', async (req, res) => {
     const user = await getAuthenticatedUser(req);
+    const curriculumCatalog = await getCurriculumCatalog();
 
     if (!user) {
       return res.status(401).json({ error: 'Sessao invalida.' });
@@ -319,7 +368,7 @@ function createApp({
       },
     });
 
-    return res.json(buildMapPayload(updatedUser, progressResult.courseId));
+    return res.json(await buildMapPayload(updatedUser, progressResult.courseId));
   });
 
   app.use('/api', (req, res) => {
@@ -361,8 +410,6 @@ function createApp({
 }
 
 module.exports = {
-  buildMapPayload,
-  buildCurriculumSummary,
   createApp,
   sanitizeUser,
 };

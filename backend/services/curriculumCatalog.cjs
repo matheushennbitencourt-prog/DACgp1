@@ -125,6 +125,16 @@ function createCourseSnapshot(curriculum) {
   };
 }
 
+function mergeCurriculumSources(importedCurriculums = []) {
+  const merged = { ...curriculums };
+
+  importedCurriculums.forEach((curriculum) => {
+    merged[curriculum.id] = curriculum;
+  });
+
+  return merged;
+}
+
 function createCurriculumCatalog(source = curriculums) {
   const courses = new Map(
     Object.values(source).map((curriculum) => [curriculum.id, createCourseSnapshot(curriculum)]),
@@ -151,4 +161,5 @@ function createCurriculumCatalog(source = curriculums) {
 
 module.exports = {
   createCurriculumCatalog,
+  mergeCurriculumSources,
 };

@@ -1,188 +1,306 @@
 # CourseMapper
 
-Sistema local para planejamento academico com:
+CourseMapper is a full-stack academic planning app for university students. It lets the user register, log in, view a curriculum map, track completed subjects, analyze progress, and personalize the dashboard theme.
 
-- cadastro e login por matricula
-- curriculos de Ciencia da Computacao e Sistemas de Informacao
-- persistencia alternavel entre arquivo JSON local e PostgreSQL
-- calculo automatico de disciplinas disponiveis
-- destaque de caminho critico e estimativa de semestres restantes
+The project has:
 
-## Requisitos
+- a React + Vite frontend
+- an Express backend
+- support for local JSON persistence or PostgreSQL/Neon
+- automated tests for frontend and backend
 
-- Node.js 20+ recomendado
-- npm 10+ recomendado
+## Features
 
-## Como rodar
+- authentication with registration number and password
+- curriculum visualization by semester
+- progress tracking with prerequisite validation
+- "next subjects" and critical path indicators
+- user profile settings with persisted theme
+- deploy-ready setup for Vercel, Render, and GitHub Pages
 
-Instale as dependencias:
+## Tech Stack
+
+Frontend:
+
+- React 19
+- Vite
+- React Router
+- Testing Library
+- Vitest
+
+Backend:
+
+- Node.js
+- Express
+- CORS
+- Compression
+
+Persistence:
+
+- local JSON file
+- PostgreSQL
+- Neon serverless driver support
+
+## Project Structure
+
+```text
+.
+|-- backend/
+|   |-- app.cjs
+|   |-- server.cjs
+|   |-- config.cjs
+|   |-- security.cjs
+|   |-- seed.cjs
+|   |-- data/
+|   |-- repositories/
+|   |-- services/
+|   |-- sql/
+|   `-- tests/
+|-- src/
+|   |-- App.jsx
+|   |-- App.css
+|   |-- app-utils.js
+|   |-- main.jsx
+|   |-- pages/
+|   |-- utils/
+|   `-- *.test.jsx
+|-- test/
+|-- public/
+|-- .env.example
+|-- render.yaml
+|-- vercel.json
+|-- vite.config.js
+|-- vitest.config.js
+`-- README.md
+```
+
+## Main Flows
+
+Frontend:
+
+- login and registration screen
+- dashboard with overview, curriculum, board, analytics, and settings pages
+- token and theme persistence via `localStorage`
+- API fallback to local backend in development when needed
+
+Backend:
+
+- `/api/auth/register`
+- `/api/auth/login`
+- `/api/auth/logout`
+- `/api/auth/me`
+- `/api/curriculums`
+- `/api/map`
+- `/api/profile`
+- `/api/progress/toggle`
+- `/api/health`
+
+## Requirements
+
+- Node.js 20+ recommended
+- npm 10+ recommended
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and adjust if needed.
+
+Example:
+
+```bash
+PORT=3001
+VITE_API_BASE_URL=/api
+STORAGE_DRIVER=file
+USERS_FILE=backend/data/users.json
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/coursemapper
+```
+
+Description:
+
+- `PORT`: backend port
+- `VITE_API_BASE_URL`: frontend API base URL
+- `STORAGE_DRIVER`: `file` or `postgres`
+- `USERS_FILE`: JSON database path when using file storage
+- `DATABASE_URL`: PostgreSQL connection string
+
+## Installation
 
 ```bash
 npm install
 ```
 
-Opcionalmente, crie um usuario demo:
+## Running Locally
 
-```bash
-npm run seed
-```
-
-Suba frontend e backend juntos:
+Run frontend and backend together:
 
 ```bash
 npm run dev:all
 ```
 
-Aplicacao frontend:
+Run only the frontend:
 
-- `http://localhost:5173`
+```bash
+npm run dev
+```
 
-API local:
+Run only the backend:
 
-- `http://localhost:3001/api/health`
+```bash
+npm run backend
+```
 
-## Scripts uteis
+Default local URLs:
 
-- `npm run dev`: sobe apenas o frontend Vite
-- `npm run backend`: sobe apenas o backend Express com watch
-- `npm run dev:all`: sobe frontend e backend juntos
-- `npm run seed`: cria um usuario demo local
-- `npm test`: executa os testes unitarios com Vitest
-- `npm run test:watch`: executa os testes em modo observacao
-- `npm run build`: gera build de producao
-- `npm run lint`: valida o frontend com ESLint
+- frontend: `http://localhost:5173`
+- backend health check: `http://localhost:3001/api/health`
 
-## Persistencia local
+## Demo User
 
-Os usuarios e o progresso ficam salvos em:
+Create or update the demo user:
+
+```bash
+npm run seed
+```
+
+Credentials:
+
+- registration: `2026000001`
+- password: `Demo@2026`
+
+## Available Scripts
+
+- `npm run dev`: starts the frontend with Vite
+- `npm run backend`: starts the Express backend in watch mode
+- `npm run dev:all`: runs frontend and backend together
+- `npm run seed`: creates or refreshes the demo user
+- `npm run build`: creates the production frontend build
+- `npm run preview`: previews the production build locally
+- `npm run lint`: runs ESLint
+- `npm test`: runs the automated test suite
+- `npm run test:watch`: runs Vitest in watch mode
+
+## Persistence Modes
+
+### File Storage
+
+Use:
+
+```bash
+STORAGE_DRIVER=file
+```
+
+Data is stored in:
 
 - `backend/data/users.json`
 
-## Persistencia com PostgreSQL
+This is the fastest option for local development.
 
-O backend agora aceita 2 drivers:
+### PostgreSQL / Neon
 
-- `STORAGE_DRIVER=file`
-- `STORAGE_DRIVER=postgres`
-
-Para usar PostgreSQL:
-
-1. Crie um banco, por exemplo `coursemapper`.
-2. Ajuste o `.env`:
+Use:
 
 ```bash
 STORAGE_DRIVER=postgres
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/coursemapper
 ```
 
-3. Suba o backend normalmente com:
+Relevant files:
 
-```bash
-npm run backend
-```
-
-O schema de PostgreSQL fica em:
-
+- `backend/repositories/postgresUserRepository.cjs`
 - `backend/sql/schema.postgres.sql`
 
-Observacao:
+The backend initializes the schema automatically when the PostgreSQL repository starts.
 
-- o repositório PostgreSQL executa esse schema automaticamente na inicializacao
-- o script `npm run seed` funciona tanto em `file` quanto em `postgres`
+## Security Notes
 
-## Observacoes
+- passwords are hashed with `scrypt`
+- registration validates password strength
+- email addresses are normalized before persistence
+- profile updates validate email and allowed themes
+- session access is protected through bearer token authentication
 
-- O frontend usa proxy do Vite para `/api`, apontando para `http://localhost:3001`.
-- Para resetar o ambiente local, basta limpar o arquivo `backend/data/users.json`.
-- O backend carrega configuracoes do arquivo `.env`.
+## Testing
 
-## Deploy externo
+Run all tests:
 
-Stack recomendada:
+```bash
+npm test
+```
 
-- frontend: Vercel
-- backend: Render
-- banco: Neon
+The repository includes:
 
-Alternativa pronta neste repositório:
+- backend tests in `backend/tests/`
+- frontend tests in `src/*.test.jsx`
+- utility tests in `src/utils/`
 
-- frontend: GitHub Pages via GitHub Actions
-- backend: Render
+## Architecture Notes
 
-### Backend no Render
+Backend service split:
 
-O projeto ja inclui:
+- `backend/app.cjs`: app factory and route wiring
+- `backend/services/curriculumCatalog.cjs`: curriculum catalog/indexing
+- `backend/services/mapService.cjs`: curriculum map payload building
+- `backend/services/progressService.cjs`: subject completion rules
+- `backend/repositories/`: storage layer abstraction
+
+Frontend organization:
+
+- `src/App.jsx`: app shell and route flow
+- `src/pages/BoardPage.jsx`: board visualization
+- `src/app-utils.js`: dashboard formatting and helper logic
+- `src/utils/authValidation.js`: credential validation helpers
+
+## Deploy
+
+### Render
+
+The repository includes:
 
 - `render.yaml`
 
-Variaveis importantes no Render:
+Recommended environment values:
 
-- `PORT=10000`
-- `STORAGE_DRIVER=file` para subir rapido sem banco
-- ou `STORAGE_DRIVER=postgres` com `DATABASE_URL=...` quando o Postgres estiver validado
+```bash
+PORT=10000
+STORAGE_DRIVER=file
+```
+
+Or use PostgreSQL:
+
+```bash
+STORAGE_DRIVER=postgres
+DATABASE_URL=...
+```
 
 Health check:
 
 - `/api/health`
 
-### Frontend na Vercel
+### Vercel
 
-O projeto ja inclui:
+The repository includes:
 
 - `vercel.json`
 
-Defina na Vercel a variavel:
+Set:
 
 ```bash
-VITE_API_BASE_URL=https://SEU-BACKEND.onrender.com/api
+VITE_API_BASE_URL=https://YOUR-BACKEND.onrender.com/api
 ```
 
-Observacao:
+### GitHub Pages
 
-- em ambiente externo o frontend nao faz fallback para `localhost`, entao o `VITE_API_BASE_URL` precisa apontar para a URL publica da API
-
-### Frontend no GitHub Pages
-
-O projeto agora inclui o workflow:
+The repository includes:
 
 - `.github/workflows/deploy-pages.yml`
 
-Esse workflow publica automaticamente o frontend no GitHub Pages a cada push na branch `main`, usando:
+The workflow builds the frontend on every push to `main`.
 
-- `VITE_API_BASE_URL=https://dacgp1.onrender.com/api`
-- `VITE_BASE_PATH=/DACgp1/`
+## Troubleshooting
 
-URL esperada do frontend publicado:
+- If the frontend receives HTML instead of JSON, make sure the backend is running and `VITE_API_BASE_URL` is correct.
+- If the backend fails with PostgreSQL, confirm `DATABASE_URL` and the selected `STORAGE_DRIVER`.
+- If you want to reset local file storage, clear `backend/data/users.json`.
 
-- `https://matheushennbitencourt-prog.github.io/DACgp1/`
+## Status
 
-Se o Pages ainda nao estiver ativo no repositorio, basta habilitar:
-
-1. GitHub repository `Settings`
-2. `Pages`
-3. Source/Build via `GitHub Actions`
-
-## Usuario demo
-
-Depois de rodar `npm run seed`, voce pode entrar com:
-
-- matricula: `2026000001`
-- senha: `Demo@2026`
-
-## Regras de seguranca
-
-- o cadastro exige senha com no minimo 8 caracteres
-- a senha deve ter letra maiuscula, letra minuscula, numero e caractere especial
-- a senha nao pode conter espacos
-- o backend protege a senha com hash baseado em `scrypt`
-- o e-mail precisa ter formato valido e dominio resolvivel
-
-## Camada de persistencia
-
-Arquivos principais:
-
-- `backend/repositories/fileUserRepository.cjs`
-- `backend/repositories/postgresUserRepository.cjs`
-- `backend/repositories/index.cjs`
-
-Com isso, a API continua igual para o frontend e so a camada de persistencia muda via `.env`.
+This project is ready for local development, automated testing, and production deployment of frontend and backend separately.

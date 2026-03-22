@@ -384,6 +384,12 @@ function SettingsPage({
   settingsForm,
   setSettingsForm,
   onSaveProfile,
+  onImportCurriculum,
+  importForm,
+  setImportForm,
+  importLoading,
+  importError,
+  importSuccess,
   settingsLoading,
   settingsError,
   settingsSuccess,
@@ -400,6 +406,24 @@ function SettingsPage({
       reader.readAsDataURL(file);
     });
     setSettingsForm((current) => ({ ...current, avatarUrl: dataUrl }));
+  }
+
+  async function handleCurriculumFileChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const sourceText = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('Falha ao ler o arquivo da grade.'));
+      reader.readAsText(file, 'utf-8');
+    });
+
+    setImportForm((current) => ({
+      ...current,
+      fileName: file.name,
+      sourceText,
+    }));
   }
 
   return (
@@ -454,6 +478,32 @@ function SettingsPage({
           <div className="settings-actions"><button type="submit" className="primary-button" disabled={settingsLoading || !hasSettingsChanges}>{settingsLoading ? 'Salvando...' : 'Salvar configurações'}</button></div>
         </form>
       </section>
+      <section className="surface-card">
+        <div className="card-heading"><div><p className="section-kicker">Grade curricular</p><h3>Importar nova grade</h3></div></div>
+        <form className="settings-form" onSubmit={onImportCurriculum}>
+          <label>Nome do arquivo
+            <input
+              value={importForm.fileName}
+              onChange={(event) => setImportForm((current) => ({ ...current, fileName: event.target.value }))}
+              placeholder="grade-curricular.txt"
+            />
+          </label>
+          <label>Arquivo de texto
+            <span className="upload-button">Selecionar arquivo<input type="file" accept=".txt,.csv,.json,.md" onChange={handleCurriculumFileChange} /></span>
+          </label>
+          <label className="settings-textarea-field">Conteudo da grade
+            <textarea
+              value={importForm.sourceText}
+              onChange={(event) => setImportForm((current) => ({ ...current, sourceText: event.target.value }))}
+              placeholder="Cole aqui a grade curricular em texto, CSV ou JSON."
+              rows={10}
+            />
+          </label>
+          {importError ? <p className="form-error">{importError}</p> : null}
+          {importSuccess ? <p className="form-success">{importSuccess}</p> : null}
+          <div className="settings-actions"><button type="submit" className="primary-button" disabled={importLoading || !importForm.sourceText.trim()}>{importLoading ? 'Importando...' : 'Importar grade'}</button></div>
+        </form>
+      </section>
     </div>
   );
 }
@@ -472,6 +522,12 @@ function Dashboard({
   settingsForm,
   setSettingsForm,
   onSaveProfile,
+  onImportCurriculum,
+  importForm,
+  setImportForm,
+  importLoading,
+  importError,
+  importSuccess,
   settingsLoading,
   settingsError,
   settingsSuccess,
@@ -547,6 +603,12 @@ function Dashboard({
                   settingsForm={settingsForm}
                   setSettingsForm={setSettingsForm}
                   onSaveProfile={onSaveProfile}
+                  onImportCurriculum={onImportCurriculum}
+                  importForm={importForm}
+                  setImportForm={setImportForm}
+                  importLoading={importLoading}
+                  importError={importError}
+                  importSuccess={importSuccess}
                   settingsLoading={settingsLoading}
                   settingsError={settingsError}
                   settingsSuccess={settingsSuccess}
@@ -574,14 +636,18 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState(getStoredTheme);
   const [settingsForm, setSettingsForm] = useState(getSettingsForm(null, getStoredTheme()));
+  const [importForm, setImportForm] = useState({ fileName: '', sourceText: '' });
   const [authLoading, setAuthLoading] = useState(false);
   const [mapLoading, setMapLoading] = useState(false);
   const [settingsLoading, setSettingsLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState('');
   const [authError, setAuthError] = useState('');
   const [dashboardError, setDashboardError] = useState('');
   const [settingsError, setSettingsError] = useState('');
   const [settingsSuccess, setSettingsSuccess] = useState('');
+  const [importError, setImportError] = useState('');
+  const [importSuccess, setImportSuccess] = useState('');
   const persistedTheme = user?.preferences?.theme || getStoredTheme();
   const hasSettingsChanges = JSON.stringify(normalizeSettingsForCompare(settingsForm)) !== JSON.stringify(normalizeSettingsForCompare(getSettingsForm(user, persistedTheme)));
 
@@ -702,6 +768,9 @@ export default function App() {
       setSettingsForm(getSettingsForm(null, getStoredTheme()));
       setSettingsError('');
       setSettingsSuccess('');
+      setImportForm({ fileName: '', sourceText: '' });
+      setImportError('');
+      setImportSuccess('');
     }
   }
 
@@ -775,6 +844,32 @@ export default function App() {
     }
   }
 
+  async function handleImportCurriculum(event) {
+    event.preventDefault();
+    setImportLoading(true);
+    setImportError('');
+    setImportSuccess('');
+
+    try {
+      const response = await apiRequest('/curriculums/import', {
+        method: 'POST',
+        body: JSON.stringify({
+          fileName: importForm.fileName.trim(),
+          sourceText: importForm.sourceText,
+        }),
+      }, token);
+
+      setCurriculums(response.curriculums);
+      setSelectedCourseId(response.curriculum.id);
+      setImportForm({ fileName: '', sourceText: '' });
+      setImportSuccess(`Grade "${response.curriculum.name}" importada com sucesso.`);
+    } catch (error) {
+      setImportError(error.message);
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
   if (loading) {
     return <div className="screen-message">Preparando sua área acadêmica...</div>;
   }
@@ -809,6 +904,12 @@ export default function App() {
       settingsForm={settingsForm}
       setSettingsForm={setSettingsForm}
       onSaveProfile={handleSaveProfile}
+      onImportCurriculum={handleImportCurriculum}
+      importForm={importForm}
+      setImportForm={setImportForm}
+      importLoading={importLoading}
+      importError={importError}
+      importSuccess={importSuccess}
       settingsLoading={settingsLoading}
       settingsError={settingsError}
       settingsSuccess={settingsSuccess}

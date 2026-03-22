@@ -1,12 +1,14 @@
 const config = require('./config.cjs');
-const { createUserRepository } = require('./repositories/index.cjs');
+const { createCurriculumRepository, createUserRepository } = require('./repositories/index.cjs');
 const { createApp } = require('./app.cjs');
 
 const userRepository = createUserRepository();
-const app = createApp({ userRepository, config });
+const curriculumRepository = createCurriculumRepository();
+const app = createApp({ userRepository, curriculumRepository, config });
 
 async function startServer(port = config.port) {
   await userRepository.init();
+  await curriculumRepository.init();
 
   return new Promise((resolve, reject) => {
     const server = app.listen(port, () => {
