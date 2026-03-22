@@ -4,8 +4,11 @@ import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
 const {
+  assertSecureRuntimeConfig,
+  createCorsOriginValidator,
   getPasswordSecurityMessage,
   hashPassword,
+  isAllowedOrigin,
   isValidEmail,
   normalizeEmail,
   verifyPassword,
@@ -35,5 +38,46 @@ describe('security helpers', () => {
     expect(hash).not.toContain('Senhaforte1!')
     expect(verifyPassword('Senhaforte1!', hash)).toBe(true)
     expect(verifyPassword('Senhaerrada1!', hash)).toBe(false)
+  })
+
+  it('valida configuracao segura em producao', () => {
+    expect(() => assertSecureRuntimeConfig({
+      isProduction: true,
+      storageDriver: 'file',
+      databaseUrl: '',
+      allowedOrigins: [],
+    })).toThrow('STORAGE_DRIVER=postgres')
+
+    expect(() => assertSecureRuntimeConfig({
+      isProduction: true,
+      storageDriver: 'postgres',
+      databaseUrl: 'postgresql://example',
+      allowedOrigins: ['https://app.example.com'],
+    })).not.toThrow()
+  })
+
+  it('limita origens permitidas no cors', async () => {
+    expect(isAllowedOrigin('', ['https://app.example.com'])).toBe(true)
+    expect(isAllowedOrigin('https://app.example.com', ['https://app.example.com'])).toBe(true)
+    expect(isAllowedOrigin('https://evil.example.com', ['https://app.example.com'])).toBe(false)
+
+    const validator = createCorsOriginValidator({
+      isProduction: true,
+      allowedOrigins: ['https://app.example.com'],
+    })
+
+    await expect(new Promise((resolve, reject) => {
+      validator('https://app.example.com', (error, allowed) => {
+        if (error) reject(error)
+        else resolve(allowed)
+      })
+    })).resolves.toBe(true)
+
+    await expect(new Promise((resolve, reject) => {
+      validator('https://evil.example.com', (error, allowed) => {
+        if (error) reject(error)
+        else resolve(allowed)
+      })
+    })).rejects.toThrow('Origem nao autorizada')
   })
 })

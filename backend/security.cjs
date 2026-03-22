@@ -5,9 +5,116 @@ const EMAIL_PATTERN = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Za-z]{2,}$/;
 const DOMAIN_CACHE_TTL_MS = 10 * 60 * 1000;
 const DNS_VALIDATION_TIMEOUT_MS = 150;
 const domainValidationCache = new Map();
+const PASSWORD_TOO_SHORT_MESSAGE = 'A senha deve ter pelo menos 8 caracteres.';
+const PASSWORD_HAS_SPACES_MESSAGE = 'A senha nao pode conter espacos.';
+const PASSWORD_MISSING_LOWERCASE_MESSAGE = 'A senha deve incluir pelo menos uma letra minuscula.';
+const PASSWORD_MISSING_UPPERCASE_MESSAGE = 'A senha deve incluir pelo menos uma letra maiuscula.';
+const PASSWORD_MISSING_NUMBER_MESSAGE = 'A senha deve incluir pelo menos um numero.';
+const PASSWORD_MISSING_SPECIAL_MESSAGE = 'A senha deve incluir pelo menos um caractere especial.';
+const SECURE_THEMES = new Set(['brand', 'dark', 'white']);
+let lastEmailInput = null;
+let lastEmailOutput = '';
+let lastValidEmailInput = null;
+let lastValidEmailOutput = false;
+let lastPasswordInput = null;
+let lastPasswordOutput = '';
+
+function assertSecureRuntimeConfig(config) {
+  if (!config?.isProduction) {
+    return;
+  }
+
+  if (config.storageDriver !== 'postgres') {
+    throw new Error('Em producao, defina STORAGE_DRIVER=postgres para evitar persistencia local sensivel.');
+  }
+
+  if (!config.databaseUrl) {
+    throw new Error('Em producao, DATABASE_URL e obrigatoria.');
+  }
+
+  if (!Array.isArray(config.allowedOrigins) || config.allowedOrigins.length === 0) {
+    throw new Error('Em producao, configure ALLOWED_ORIGINS com os domínios autorizados do frontend.');
+  }
+}
+
+function isAllowedOrigin(origin, allowedOrigins = []) {
+  if (!origin) {
+    return true;
+  }
+
+  return allowedOrigins.includes(origin);
+}
+
+function createCorsOriginValidator(config) {
+  const allowedOrigins = Array.isArray(config?.allowedOrigins) ? config.allowedOrigins : [];
+
+  if (!config?.isProduction && allowedOrigins.length === 0) {
+    return (_origin, callback) => callback(null, true);
+  }
+
+  return (origin, callback) => {
+    if (isAllowedOrigin(origin, allowedOrigins)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error('Origem nao autorizada por CORS.'));
+  };
+}
+
+function applySecurityHeaders(req, res, next, { isProduction = false } = {}) {
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+
+  if (isProduction) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
+
+  if (req.path.startsWith('/api/auth') || req.path.startsWith('/api/profile')) {
+    res.setHeader('Cache-Control', 'no-store');
+  }
+
+  next();
+}
+
+function isDigitCode(code) {
+  return code >= 48 && code <= 57;
+}
+
+function isLowercaseCode(code) {
+  return code >= 97 && code <= 122;
+}
+
+function isUppercaseCode(code) {
+  return code >= 65 && code <= 90;
+}
+
+function isAlphaCode(code) {
+  return isLowercaseCode(code) || isUppercaseCode(code);
+}
+
+function isAlphaNumericCode(code) {
+  return isAlphaCode(code) || isDigitCode(code);
+}
+
+function isWhitespaceCode(code) {
+  return code === 32 || code === 9 || code === 10 || code === 13 || code === 12 || code === 11;
+}
 
 function normalizeEmail(email) {
-  return String(email || '').trim().toLowerCase();
+  const input = String(email || '');
+
+  if (input === lastEmailInput) {
+    return lastEmailOutput;
+  }
+
+  const normalized = input.trim().toLowerCase();
+  lastEmailInput = input;
+  lastEmailOutput = normalized;
+  return normalized;
 }
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
@@ -33,35 +140,149 @@ function verifyPassword(password, storedHash) {
 function getPasswordSecurityMessage(password) {
   const value = String(password || '');
 
+  if (value === lastPasswordInput) {
+    return lastPasswordOutput;
+  }
+
+  let hasWhitespace = false;
+  let hasLowercase = false;
+  let hasUppercase = false;
+  let hasNumber = false;
+  let hasSpecial = false;
+
   if (value.length < 8) {
-    return 'A senha deve ter pelo menos 8 caracteres.';
+    lastPasswordInput = value;
+    lastPasswordOutput = PASSWORD_TOO_SHORT_MESSAGE;
+    return lastPasswordOutput;
   }
 
-  if (/\s/.test(value)) {
-    return 'A senha nao pode conter espacos.';
+  for (let index = 0; index < value.length; index += 1) {
+    const charCode = value.charCodeAt(index);
+
+    if (isWhitespaceCode(charCode)) {
+      hasWhitespace = true;
+      continue;
+    }
+
+    if (isLowercaseCode(charCode)) {
+      hasLowercase = true;
+      continue;
+    }
+
+    if (isUppercaseCode(charCode)) {
+      hasUppercase = true;
+      continue;
+    }
+
+    if (isDigitCode(charCode)) {
+      hasNumber = true;
+      continue;
+    }
+
+    hasSpecial = true;
   }
 
-  if (!/[a-z]/.test(value)) {
-    return 'A senha deve incluir pelo menos uma letra minuscula.';
+  if (hasWhitespace) {
+    lastPasswordInput = value;
+    lastPasswordOutput = PASSWORD_HAS_SPACES_MESSAGE;
+    return lastPasswordOutput;
   }
 
-  if (!/[A-Z]/.test(value)) {
-    return 'A senha deve incluir pelo menos uma letra maiuscula.';
+  if (!hasLowercase) {
+    lastPasswordInput = value;
+    lastPasswordOutput = PASSWORD_MISSING_LOWERCASE_MESSAGE;
+    return lastPasswordOutput;
   }
 
-  if (!/\d/.test(value)) {
-    return 'A senha deve incluir pelo menos um numero.';
+  if (!hasUppercase) {
+    lastPasswordInput = value;
+    lastPasswordOutput = PASSWORD_MISSING_UPPERCASE_MESSAGE;
+    return lastPasswordOutput;
   }
 
-  if (!/[^A-Za-z\d\s]/.test(value)) {
-    return 'A senha deve incluir pelo menos um caractere especial.';
+  if (!hasNumber) {
+    lastPasswordInput = value;
+    lastPasswordOutput = PASSWORD_MISSING_NUMBER_MESSAGE;
+    return lastPasswordOutput;
   }
 
-  return '';
+  if (!hasSpecial) {
+    lastPasswordInput = value;
+    lastPasswordOutput = PASSWORD_MISSING_SPECIAL_MESSAGE;
+    return lastPasswordOutput;
+  }
+
+  lastPasswordInput = value;
+  lastPasswordOutput = '';
+  return lastPasswordOutput;
 }
 
 function isValidEmail(email) {
-  return EMAIL_PATTERN.test(normalizeEmail(email));
+  if (email === lastValidEmailInput) {
+    return lastValidEmailOutput;
+  }
+
+  const normalizedEmail = normalizeEmail(email);
+  const atIndex = normalizedEmail.indexOf('@');
+
+  if (
+    atIndex <= 0 ||
+    atIndex !== normalizedEmail.lastIndexOf('@') ||
+    atIndex === normalizedEmail.length - 1
+  ) {
+    lastValidEmailInput = email;
+    lastValidEmailOutput = false;
+    return false;
+  }
+
+  const localPart = normalizedEmail.slice(0, atIndex);
+  const domainPart = normalizedEmail.slice(atIndex + 1);
+  const lastDotIndex = domainPart.lastIndexOf('.');
+
+  if (lastDotIndex <= 0 || lastDotIndex === domainPart.length - 1) {
+    lastValidEmailInput = email;
+    lastValidEmailOutput = false;
+    return false;
+  }
+
+  for (let index = 0; index < localPart.length; index += 1) {
+    const charCode = localPart.charCodeAt(index);
+
+    if (
+      !isAlphaNumericCode(charCode) &&
+      charCode !== 46 &&
+      charCode !== 95 &&
+      charCode !== 37 &&
+      charCode !== 43 &&
+      charCode !== 45
+    ) {
+      lastValidEmailInput = email;
+      lastValidEmailOutput = false;
+      return false;
+    }
+  }
+
+  for (let index = 0; index < domainPart.length; index += 1) {
+    const charCode = domainPart.charCodeAt(index);
+
+    if (!isAlphaNumericCode(charCode) && charCode !== 46 && charCode !== 45) {
+      lastValidEmailInput = email;
+      lastValidEmailOutput = false;
+      return false;
+    }
+  }
+
+  for (let index = lastDotIndex + 1; index < domainPart.length; index += 1) {
+    if (!isAlphaCode(domainPart.charCodeAt(index))) {
+      lastValidEmailInput = email;
+      lastValidEmailOutput = false;
+      return false;
+    }
+  }
+
+  lastValidEmailInput = email;
+  lastValidEmailOutput = domainPart.length - lastDotIndex - 1 >= 2;
+  return lastValidEmailOutput;
 }
 
 function getCachedDomainValidation(domain) {
@@ -141,9 +362,14 @@ async function hasResolvableEmailDomain(email) {
 
 module.exports = {
   DNS_VALIDATION_TIMEOUT_MS,
+  SECURE_THEMES,
+  applySecurityHeaders,
+  assertSecureRuntimeConfig,
+  createCorsOriginValidator,
   getPasswordSecurityMessage,
   hasResolvableEmailDomain,
   hashPassword,
+  isAllowedOrigin,
   isValidEmail,
   normalizeEmail,
   verifyPassword,

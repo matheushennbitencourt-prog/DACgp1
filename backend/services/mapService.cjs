@@ -77,7 +77,12 @@ function buildMapPayload(user, selectedCourseId, curriculumCatalog) {
     course: {
       id: curriculum.id,
       code: curriculum.code,
+      baseCode: curriculum.baseCode,
       name: curriculum.name,
+      catalogName: curriculum.catalogName,
+      catalogKey: curriculum.catalogKey,
+      academicYear: curriculum.academicYear,
+      versionLabel: curriculum.versionLabel,
       trailLabels: curriculum.trailLabels,
     },
     stats: {

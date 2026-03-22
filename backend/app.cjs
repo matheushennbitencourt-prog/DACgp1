@@ -12,6 +12,10 @@ const { parseCurriculumSource } = require('./services/curriculumImportService.cj
 const { buildMapPayload: buildMapPayloadFromCatalog } = require('./services/mapService.cjs');
 const { toggleSubjectProgress } = require('./services/progressService.cjs');
 const {
+  SECURE_THEMES,
+  applySecurityHeaders,
+  assertSecureRuntimeConfig,
+  createCorsOriginValidator,
   getPasswordSecurityMessage,
   hasResolvableEmailDomain,
   hashPassword,
@@ -56,14 +60,20 @@ function createApp({
   config = defaultConfig,
   emailDomainValidator = hasResolvableEmailDomain,
 } = {}) {
+  assertSecureRuntimeConfig(config);
   const app = express();
   const frontendDistDir = path.resolve(__dirname, '..', 'dist');
   const frontendIndexPath = path.join(frontendDistDir, 'index.html');
   const hasFrontendBuild = fs.existsSync(frontendIndexPath);
 
-  app.use(cors());
+  app.disable('x-powered-by');
+  app.use((req, res, next) => applySecurityHeaders(req, res, next, { isProduction: config.isProduction }));
+  app.use(cors({
+    credentials: true,
+    origin: createCorsOriginValidator(config),
+  }));
   app.use(compression({ threshold: '2kb' }));
-  app.use(express.json({ limit: '8mb' }));
+  app.use(express.json({ limit: '20mb' }));
 
   async function getCurriculumCatalog() {
     const importedCurriculums = await curriculumRepository.list();
@@ -141,7 +151,7 @@ function createApp({
       return 'O dominio do e-mail nao pode ser validado.';
     }
 
-    if (!['brand', 'dark', 'white'].includes(nextTheme)) {
+    if (!SECURE_THEMES.has(nextTheme)) {
       return 'Tema invalido.';
     }
 
@@ -182,16 +192,20 @@ function createApp({
       return res.status(401).json({ error: 'Sessao invalida.' });
     }
 
-    const sourceText = String(req.body.sourceText || '').trim();
+    const sourceText = String(req.body.sourceText || '');
     const fileName = String(req.body.fileName || '').trim();
+    const fileData = String(req.body.fileData || '').trim();
+    const mimeType = String(req.body.mimeType || '').trim();
 
-    if (!sourceText) {
-      return res.status(400).json({ error: 'Envie o conteudo da grade curricular.' });
+    if (!sourceText.trim() && !fileData) {
+      return res.status(400).json({ error: 'Envie o conteudo ou o arquivo da grade curricular.' });
     }
 
     try {
       const curriculum = await parseCurriculumSource({
+        fileData,
         fileName,
+        mimeType,
         openaiApiKey: config.openaiApiKey,
         openaiModel: config.openaiModel,
         sourceText,
@@ -396,7 +410,7 @@ function createApp({
 
   app.use((error, req, res, next) => {
     if (error?.type === 'entity.too.large') {
-      return res.status(413).json({ error: 'A imagem enviada e grande demais. Use uma foto menor.' });
+      return res.status(413).json({ error: 'O arquivo enviado e grande demais. Use um PDF, DOCX ou imagem menor.' });
     }
 
     if (error instanceof SyntaxError && 'body' in error) {

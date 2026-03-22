@@ -1,5 +1,32 @@
 const curriculums = require('../data/curriculums.cjs');
 
+function slugify(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+}
+
+function normalizeVersionMeta(curriculum) {
+  const catalogName = String(curriculum.catalogName || curriculum.name || 'Curso').trim();
+  const baseCode = String(curriculum.baseCode || curriculum.code || curriculum.id || 'CURSO').trim().toUpperCase();
+  const academicYear = Number.isInteger(curriculum.academicYear) ? curriculum.academicYear : null;
+  const versionLabel = String(
+    curriculum.versionLabel || (academicYear ? String(academicYear) : 'Grade padrao'),
+  ).trim();
+
+  return {
+    ...curriculum,
+    catalogName,
+    catalogKey: String(curriculum.catalogKey || slugify(baseCode || catalogName) || curriculum.id).trim(),
+    baseCode,
+    academicYear,
+    versionLabel,
+  };
+}
+
 function buildChildrenMap(subjects) {
   const childrenMap = new Map();
 
@@ -98,11 +125,12 @@ function collectDependentSubjects(subjectId, childrenMap, cache, visited = new S
 }
 
 function createCourseSnapshot(curriculum) {
-  const subjectMap = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
-  const childrenMap = buildChildrenMap(curriculum.subjects);
+  const normalizedCurriculum = normalizeVersionMeta(curriculum);
+  const subjectMap = new Map(normalizedCurriculum.subjects.map((subject) => [subject.id, subject]));
+  const childrenMap = buildChildrenMap(normalizedCurriculum.subjects);
   const dependentMap = new Map();
 
-  curriculum.subjects.forEach((subject) => {
+  normalizedCurriculum.subjects.forEach((subject) => {
     dependentMap.set(
       subject.id,
       Array.from(collectDependentSubjects(subject.id, childrenMap, dependentMap)),
@@ -110,18 +138,23 @@ function createCourseSnapshot(curriculum) {
   });
 
   return {
-    ...curriculum,
+    ...normalizedCurriculum,
     summary: {
-      id: curriculum.id,
-      code: curriculum.code,
-      name: curriculum.name,
-      trailLabels: curriculum.trailLabels,
-      totalSubjects: curriculum.subjects.length,
+      id: normalizedCurriculum.id,
+      code: normalizedCurriculum.code,
+      baseCode: normalizedCurriculum.baseCode,
+      name: normalizedCurriculum.name,
+      catalogName: normalizedCurriculum.catalogName,
+      catalogKey: normalizedCurriculum.catalogKey,
+      academicYear: normalizedCurriculum.academicYear,
+      versionLabel: normalizedCurriculum.versionLabel,
+      trailLabels: normalizedCurriculum.trailLabels,
+      totalSubjects: normalizedCurriculum.subjects.length,
     },
     subjectMap,
     childrenMap,
     dependentMap,
-    criticalPathIds: getCriticalPath(curriculum.subjects, childrenMap),
+    criticalPathIds: getCriticalPath(normalizedCurriculum.subjects, childrenMap),
   };
 }
 
@@ -149,7 +182,29 @@ function createCurriculumCatalog(source = curriculums) {
   }
 
   function getSummaryList() {
-    return Array.from(courses.values(), (course) => course.summary);
+    return Array.from(courses.values(), (course) => course.summary)
+      .sort((first, second) => {
+        const nameCompare = first.catalogName.localeCompare(second.catalogName);
+
+        if (nameCompare !== 0) {
+          return nameCompare;
+        }
+
+        const firstYear = first.academicYear || 0;
+        const secondYear = second.academicYear || 0;
+
+        if (firstYear !== secondYear) {
+          return secondYear - firstYear;
+        }
+
+        const versionCompare = first.versionLabel.localeCompare(second.versionLabel);
+
+        if (versionCompare !== 0) {
+          return versionCompare;
+        }
+
+        return first.id.localeCompare(second.id);
+      });
   }
 
   return {

@@ -107,20 +107,30 @@ Copy `.env.example` to `.env` and adjust if needed.
 Example:
 
 ```bash
+APP_ENV=development
 PORT=3001
 VITE_API_BASE_URL=/api
-STORAGE_DRIVER=file
+STORAGE_DRIVER=postgres
 USERS_FILE=backend/data/users.json
+IMPORTED_CURRICULUMS_FILE=backend/data/imported-curriculums.json
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/coursemapper
+ALLOWED_ORIGINS=http://localhost:5173
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-5-mini
 ```
 
 Description:
 
 - `PORT`: backend port
 - `VITE_API_BASE_URL`: frontend API base URL
+- `APP_ENV`: `development` or `production`
 - `STORAGE_DRIVER`: `file` or `postgres`
 - `USERS_FILE`: JSON database path when using file storage
+- `IMPORTED_CURRICULUMS_FILE`: JSON database path for imported curriculums when using file storage
 - `DATABASE_URL`: PostgreSQL connection string
+- `ALLOWED_ORIGINS`: comma-separated list of allowed frontend origins for CORS
+- `OPENAI_API_KEY`: required for PDF/DOCX or unstructured curriculum imports
+- `OPENAI_MODEL`: OpenAI model used by curriculum import
 
 ## Installation
 
@@ -217,6 +227,9 @@ The backend initializes the schema automatically when the PostgreSQL repository 
 - email addresses are normalized before persistence
 - profile updates validate email and allowed themes
 - session access is protected through bearer token authentication
+- production blocks `STORAGE_DRIVER=file` and requires `ALLOWED_ORIGINS`
+- API responses use hardened headers like `X-Frame-Options`, `Referrer-Policy`, and `HSTS` in production
+- imported PDF and DOCX files are restricted by MIME type and size before parsing
 
 ## Testing
 
@@ -260,15 +273,17 @@ The repository includes:
 Recommended environment values:
 
 ```bash
+APP_ENV=production
 PORT=10000
-STORAGE_DRIVER=file
+STORAGE_DRIVER=postgres
+ALLOWED_ORIGINS=https://YOUR-FRONTEND.vercel.app
 ```
 
-Or use PostgreSQL:
+Required secrets in Render:
 
 ```bash
-STORAGE_DRIVER=postgres
 DATABASE_URL=...
+OPENAI_API_KEY=...
 ```
 
 Health check:

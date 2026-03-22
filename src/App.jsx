@@ -5,16 +5,20 @@ import {
   buildOptimisticMapData,
   canOptimisticallyToggleSubject,
   formatRegistration,
+  getCurriculumVersionLabel,
+  getFirstCurriculumIdForCatalog,
   getCriticalSubjects,
   getInitialForm,
   getInitials,
   getNextSubjects,
   getSettingsForm,
   getTrailSummary,
+  groupCurriculumsByCatalog,
   groupBySemester,
   normalizeRegistration,
   normalizeSettingsForCompare,
   pageLabels,
+  resolveCurriculumId,
   statusLabels,
   themeOptions,
   validateAuthForm,
@@ -177,7 +181,7 @@ function AuthScreen({ authMode, form, setForm, onSubmit, setAuthMode, loading, e
           {authMode === 'register' ? (
             <label>Curso
               <select value={form.courseId} onChange={(event) => setForm((current) => ({ ...current, courseId: event.target.value }))}>
-                {curriculums.map((curriculum) => <option key={curriculum.id} value={curriculum.id}>{curriculum.name}</option>)}
+                {curriculums.map((curriculum) => <option key={curriculum.id} value={curriculum.id}>{`${curriculum.name} - ${getCurriculumVersionLabel(curriculum)}`}</option>)}
               </select>
             </label>
           ) : null}
@@ -194,7 +198,21 @@ function AuthScreen({ authMode, form, setForm, onSubmit, setAuthMode, loading, e
   );
 }
 
-function Sidebar({ user, currentPage, onNavigate, onPrefetchBoard, selectedCourseId, setSelectedCourseId, curriculums, mapData, onLogout }) {
+function Sidebar({
+  user,
+  currentPage,
+  onNavigate,
+  onPrefetchBoard,
+  selectedCatalogKey,
+  onSelectCatalogKey,
+  selectedCourseId,
+  setSelectedCourseId,
+  curriculumGroups,
+  mapData,
+  onLogout,
+}) {
+  const selectedGroup = curriculumGroups.find((group) => group.key === selectedCatalogKey) || curriculumGroups[0] || null;
+
   return (
     <aside className="sidebar">
       <div className="sidebar-block">
@@ -220,9 +238,17 @@ function Sidebar({ user, currentPage, onNavigate, onPrefetchBoard, selectedCours
         </div>
       </div>
       <div className="sidebar-block">
-        <p className="sidebar-label">Currículo</p>
+        <p className="sidebar-label">Curso</p>
+        <select className="sidebar-select" value={selectedCatalogKey} onChange={(event) => onSelectCatalogKey(event.target.value)}>
+          {curriculumGroups.map((group) => <option key={group.key} value={group.key}>{group.code ? `${group.code} - ${group.name}` : group.name}</option>)}
+        </select>
+        <p className="sidebar-label">Versao da grade</p>
         <select className="sidebar-select" value={selectedCourseId} onChange={(event) => startTransition(() => setSelectedCourseId(event.target.value))}>
-          {curriculums.map((curriculum) => <option key={curriculum.id} value={curriculum.id}>{curriculum.name}</option>)}
+          {(selectedGroup?.versions || []).map((curriculum) => (
+            <option key={curriculum.id} value={curriculum.id}>
+              {getCurriculumVersionLabel(curriculum)}
+            </option>
+          ))}
         </select>
         <div className="tag-list">
           {(mapData?.course.trailLabels || []).map((trail) => <span key={trail}>{trail}</span>)}
@@ -412,6 +438,28 @@ function SettingsPage({
     const file = event.target.files?.[0];
     if (!file) return;
 
+    const normalizedFileName = String(file.name || '').toLowerCase();
+    const isBinaryGrade = normalizedFileName.endsWith('.pdf') || normalizedFileName.endsWith('.docx');
+
+    if (isBinaryGrade) {
+      const fileData = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('Falha ao ler o arquivo da grade.'));
+        reader.readAsDataURL(file);
+      });
+
+      setImportForm((current) => ({
+        ...current,
+        fileData,
+        fileName: file.name,
+        mimeType: file.type || '',
+        sourceText: '',
+      }));
+
+      return;
+    }
+
     const sourceText = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result || ''));
@@ -421,7 +469,9 @@ function SettingsPage({
 
     setImportForm((current) => ({
       ...current,
+      fileData: '',
       fileName: file.name,
+      mimeType: file.type || '',
       sourceText,
     }));
   }
@@ -488,20 +538,20 @@ function SettingsPage({
               placeholder="grade-curricular.txt"
             />
           </label>
-          <label>Arquivo de texto
-            <span className="upload-button">Selecionar arquivo<input type="file" accept=".txt,.csv,.json,.md" onChange={handleCurriculumFileChange} /></span>
+          <label>Arquivo da grade
+            <span className="upload-button">Selecionar arquivo<input type="file" accept=".txt,.csv,.json,.md,.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleCurriculumFileChange} /></span>
           </label>
           <label className="settings-textarea-field">Conteudo da grade
             <textarea
               value={importForm.sourceText}
               onChange={(event) => setImportForm((current) => ({ ...current, sourceText: event.target.value }))}
-              placeholder="Cole aqui a grade curricular em texto, CSV ou JSON."
+              placeholder="Cole aqui a grade curricular em texto, CSV ou JSON. Para PDF e DOCX, a OpenAI estrutura pre e correquisitos no backend."
               rows={10}
             />
           </label>
           {importError ? <p className="form-error">{importError}</p> : null}
           {importSuccess ? <p className="form-success">{importSuccess}</p> : null}
-          <div className="settings-actions"><button type="submit" className="primary-button" disabled={importLoading || !importForm.sourceText.trim()}>{importLoading ? 'Importando...' : 'Importar grade'}</button></div>
+          <div className="settings-actions"><button type="submit" className="primary-button" disabled={importLoading || !(importForm.sourceText.trim() || importForm.fileData)}>{importLoading ? 'Importando...' : 'Importar grade'}</button></div>
         </form>
       </section>
     </div>
@@ -539,6 +589,9 @@ function Dashboard({
   const deferredSidebarMapData = useDeferredValue(mapData);
   const routeKey = location.pathname.replace(/^\//, '') || 'overview';
   const currentPage = pageLabels[routeKey] ? routeKey : 'overview';
+  const curriculumGroups = groupCurriculumsByCatalog(curriculums);
+  const selectedCurriculum = curriculums.find((item) => item.id === selectedCourseId) || curriculumGroups[0]?.versions?.[0] || null;
+  const selectedCatalogKey = selectedCurriculum?.catalogKey || curriculumGroups[0]?.key || '';
 
   function handleNavigate(page) {
     if (page === 'board') {
@@ -547,6 +600,16 @@ function Dashboard({
 
     const nextPath = page === 'overview' ? '/' : `/${page}`;
     startTransition(() => navigate(nextPath));
+  }
+
+  function handleSelectCatalogKey(nextCatalogKey) {
+    const nextCourseId = getFirstCurriculumIdForCatalog(curriculums, nextCatalogKey);
+
+    if (!nextCourseId) {
+      return;
+    }
+
+    startTransition(() => setSelectedCourseId(nextCourseId));
   }
 
   useEffect(() => {
@@ -570,16 +633,22 @@ function Dashboard({
         currentPage={currentPage}
         onNavigate={handleNavigate}
         onPrefetchBoard={preloadBoardPage}
+        selectedCatalogKey={selectedCatalogKey}
+        onSelectCatalogKey={handleSelectCatalogKey}
         selectedCourseId={selectedCourseId}
         setSelectedCourseId={setSelectedCourseId}
-        curriculums={curriculums}
+        curriculumGroups={curriculumGroups}
         mapData={deferredSidebarMapData}
         onLogout={onLogout}
       />
       <main className="dashboard-main">
         <header className="main-header">
           <div><p className="section-kicker">Workspace</p><h1>{pageLabels[currentPage]}</h1></div>
-          <div className="header-meta"><span>{mapData?.course.code || '--'}</span><span>{mapData?.stats.completionRate ?? 0}% concluído</span></div>
+          <div className="header-meta">
+            <span>{mapData?.course.baseCode || mapData?.course.code || '--'}</span>
+            <span>{mapData?.course.versionLabel || 'Grade padrao'}</span>
+            <span>{mapData?.stats.completionRate ?? 0}% concluído</span>
+          </div>
         </header>
         {dashboardError ? <p className="banner-error">{dashboardError}</p> : null}
         {mapLoading ? <p className="loading-copy">Carregando painel...</p> : (
@@ -636,7 +705,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState(getStoredTheme);
   const [settingsForm, setSettingsForm] = useState(getSettingsForm(null, getStoredTheme()));
-  const [importForm, setImportForm] = useState({ fileName: '', sourceText: '' });
+  const [importForm, setImportForm] = useState({ fileData: '', fileName: '', mimeType: '', sourceText: '' });
   const [authLoading, setAuthLoading] = useState(false);
   const [mapLoading, setMapLoading] = useState(false);
   const [settingsLoading, setSettingsLoading] = useState(false);
@@ -693,6 +762,18 @@ export default function App() {
 
     bootstrapSession();
   }, [token]);
+
+  useEffect(() => {
+    if (curriculums.length === 0) {
+      return;
+    }
+
+    const nextCourseId = resolveCurriculumId(curriculums, selectedCourseId || user?.courseId || '');
+
+    if (nextCourseId && nextCourseId !== selectedCourseId) {
+      setSelectedCourseId(nextCourseId);
+    }
+  }, [curriculums, selectedCourseId, user]);
 
   useEffect(() => {
     async function loadMap() {
@@ -768,7 +849,7 @@ export default function App() {
       setSettingsForm(getSettingsForm(null, getStoredTheme()));
       setSettingsError('');
       setSettingsSuccess('');
-      setImportForm({ fileName: '', sourceText: '' });
+      setImportForm({ fileData: '', fileName: '', mimeType: '', sourceText: '' });
       setImportError('');
       setImportSuccess('');
     }
@@ -854,14 +935,16 @@ export default function App() {
       const response = await apiRequest('/curriculums/import', {
         method: 'POST',
         body: JSON.stringify({
+          fileData: importForm.fileData,
           fileName: importForm.fileName.trim(),
+          mimeType: importForm.mimeType,
           sourceText: importForm.sourceText,
         }),
       }, token);
 
       setCurriculums(response.curriculums);
       setSelectedCourseId(response.curriculum.id);
-      setImportForm({ fileName: '', sourceText: '' });
+      setImportForm({ fileData: '', fileName: '', mimeType: '', sourceText: '' });
       setImportSuccess(`Grade "${response.curriculum.name}" importada com sucesso.`);
     } catch (error) {
       setImportError(error.message);

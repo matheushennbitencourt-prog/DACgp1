@@ -1,6 +1,20 @@
 const crypto = require('crypto');
+const mammoth = require('mammoth');
+const OpenAI = require('openai');
 
-const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
+const TEXT_EXTENSIONS = new Set(['txt', 'csv', 'json', 'md']);
+const DOCX_EXTENSIONS = new Set(['docx']);
+const PDF_EXTENSIONS = new Set(['pdf']);
+const DEFAULT_OPENAI_MODEL = 'gpt-5-mini';
+const MAX_IMPORT_FILE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_IMPORT_MIME_TYPES = new Set([
+  'application/json',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/csv',
+  'text/markdown',
+  'text/plain',
+]);
 
 const curriculumSchema = {
   type: 'object',
@@ -9,7 +23,12 @@ const curriculumSchema = {
   properties: {
     id: { type: 'string' },
     code: { type: 'string' },
+    baseCode: { type: 'string' },
     name: { type: 'string' },
+    catalogName: { type: 'string' },
+    catalogKey: { type: 'string' },
+    academicYear: { type: 'integer' },
+    versionLabel: { type: 'string' },
     trailLabels: {
       type: 'array',
       items: { type: 'string' },
@@ -59,34 +78,294 @@ function normalizeList(value) {
     .filter(Boolean);
 }
 
+function uniqueList(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function normalizeSubjectId(value, fallback) {
+  return String(value || fallback || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '');
+}
+
+function normalizeReferenceIds(value) {
+  return uniqueList(normalizeList(value).map((item) => normalizeSubjectId(item)).filter(Boolean));
+}
+
 function sanitizeSubject(subject, index) {
   return {
-    id: String(subject.id || `SUBJ${index + 1}`).trim().toUpperCase(),
+    id: normalizeSubjectId(subject.id, `SUBJ${index + 1}`),
     name: String(subject.name || `Disciplina ${index + 1}`).trim(),
     semester: Math.max(1, Number(subject.semester || 1)),
     trail: String(subject.trail || 'Base').trim() || 'Base',
-    prerequisites: normalizeList(subject.prerequisites).map((item) => item.toUpperCase()),
-    corequisites: normalizeList(subject.corequisites).map((item) => item.toUpperCase()),
+    prerequisites: normalizeReferenceIds(subject.prerequisites),
+    corequisites: normalizeReferenceIds(subject.corequisites),
   };
 }
 
-function normalizeCurriculum(parsedCurriculum) {
-  const subjects = Array.isArray(parsedCurriculum.subjects)
+function extractAcademicYear(...values) {
+  const yearPattern = /\b(19|20)\d{2}\b/g;
+
+  for (const value of values) {
+    const matches = String(value || '').match(yearPattern);
+
+    if (matches?.length) {
+      return Number(matches[matches.length - 1]);
+    }
+  }
+
+  return null;
+}
+
+function stripAcademicYear(value) {
+  return String(value || '')
+    .replace(/\b(19|20)\d{2}\b/g, '')
+    .replace(/[-_/()]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function inferBaseCode(parsedCurriculum, fallbackName) {
+  const explicit = String(parsedCurriculum.baseCode || parsedCurriculum.code || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\b(19|20)\d{2}\b/g, '')
+    .replace(/[^A-Z0-9]+/g, '');
+
+  if (explicit) {
+    return explicit.slice(0, 16);
+  }
+
+  const initials = stripAcademicYear(fallbackName)
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 4)
+    .map((part) => part[0]?.toUpperCase() || '')
+    .join('');
+
+  return (initials || 'CURSO').slice(0, 16);
+}
+
+function inferCatalogName(parsedCurriculum) {
+  const resolvedName = String(
+    parsedCurriculum.catalogName || parsedCurriculum.name || parsedCurriculum.code || 'Grade importada',
+  ).trim();
+
+  return stripAcademicYear(resolvedName) || resolvedName;
+}
+
+function inferVersionLabel(parsedCurriculum, academicYear) {
+  const explicitLabel = String(parsedCurriculum.versionLabel || '').trim();
+
+  if (explicitLabel) {
+    return explicitLabel;
+  }
+
+  if (academicYear) {
+    return String(academicYear);
+  }
+
+  return 'Grade padrao';
+}
+
+function getFileExtension(fileName = '', mimeType = '') {
+  const trimmedName = String(fileName || '').trim().toLowerCase();
+  const extensionFromName = trimmedName.includes('.')
+    ? trimmedName.split('.').pop()
+    : '';
+
+  if (extensionFromName) {
+    return extensionFromName;
+  }
+
+  if (String(mimeType || '').toLowerCase().includes('pdf')) {
+    return 'pdf';
+  }
+
+  if (String(mimeType || '').toLowerCase().includes('wordprocessingml.document')) {
+    return 'docx';
+  }
+
+  return '';
+}
+
+function decodeFileData(fileData) {
+  const raw = String(fileData || '').trim();
+
+  if (!raw) {
+    throw new Error('Envie o arquivo da grade curricular.');
+  }
+
+  const dataUrlMatch = raw.match(/^data:([^;]+);base64,(.+)$/);
+
+  if (!dataUrlMatch) {
+    throw new Error('O arquivo enviado esta em um formato invalido.');
+  }
+
+  if (!ALLOWED_IMPORT_MIME_TYPES.has(dataUrlMatch[1])) {
+    throw new Error('Tipo de arquivo nao suportado para importacao de grade.');
+  }
+
+  const buffer = Buffer.from(dataUrlMatch[2], 'base64');
+
+  if (buffer.length > MAX_IMPORT_FILE_BYTES) {
+    throw new Error('O arquivo da grade excede o limite de 10 MB.');
+  }
+
+  return {
+    mimeType: dataUrlMatch[1],
+    buffer,
+    dataUrl: raw,
+  };
+}
+
+async function extractDocxText(fileData) {
+  const { buffer } = decodeFileData(fileData);
+  const result = await mammoth.extractRawText({ buffer });
+  return String(result.value || '').trim();
+}
+
+function buildOpenAIClient(openaiApiKey) {
+  return new OpenAI({
+    apiKey: openaiApiKey,
+    maxRetries: 2,
+    timeout: 45_000,
+  });
+}
+
+function buildCurriculumPrompt(fileName) {
+  return [
+    'Converta a grade curricular enviada para JSON valido.',
+    'Extraia o nome do curso sem o ano quando isso estiver claro.',
+    'Preencha academicYear e versionLabel quando a grade indicar ano, matriz, PPC ou versao.',
+    'Identifique pre-requisitos e correquisitos apenas quando estiverem explicitamente informados.',
+    'Use codigos das disciplinas nas listas de prerequisites e corequisites.',
+    'Nao invente dependencias ausentes.',
+    `Arquivo de origem: ${fileName || 'grade'}.`,
+  ].join(' ');
+}
+
+function extractStructuredText(payload) {
+  if (typeof payload.output_text === 'string' && payload.output_text.trim()) {
+    return payload.output_text;
+  }
+
+  const outputBlocks = Array.isArray(payload.output) ? payload.output : [];
+
+  for (const block of outputBlocks) {
+    const contents = Array.isArray(block.content) ? block.content : [];
+
+    for (const content of contents) {
+      if (typeof content.text === 'string' && content.text.trim()) {
+        return content.text;
+      }
+    }
+  }
+
+  return '';
+}
+
+async function parseWithOpenAI({
+  fileData = '',
+  fileName = '',
+  openaiApiKey = '',
+  openaiClient = null,
+  openaiModel = DEFAULT_OPENAI_MODEL,
+  sourceText = '',
+}) {
+  const client = openaiClient || buildOpenAIClient(openaiApiKey);
+  const content = [
+    {
+      type: 'input_text',
+      text: buildCurriculumPrompt(fileName),
+    },
+  ];
+
+  if (sourceText) {
+    content.push({
+      type: 'input_text',
+      text: sourceText,
+    });
+  }
+
+  if (fileData) {
+    content.push({
+      type: 'input_file',
+      filename: fileName || 'grade.pdf',
+      file_data: fileData,
+    });
+  }
+
+  const payload = await client.responses.create({
+    model: openaiModel || DEFAULT_OPENAI_MODEL,
+    input: [
+      {
+        role: 'user',
+        content,
+      },
+    ],
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'curriculum_import',
+        schema: curriculumSchema,
+        strict: true,
+      },
+    },
+  });
+
+  const structuredText = extractStructuredText(payload);
+
+  if (!structuredText) {
+    throw new Error('A OpenAI API nao retornou uma grade estruturada.');
+  }
+
+  return JSON.parse(structuredText);
+}
+
+function normalizeCurriculum(parsedCurriculum, { fileName = '', sourceText = '' } = {}) {
+  const rawSubjects = Array.isArray(parsedCurriculum.subjects)
     ? parsedCurriculum.subjects.map((subject, index) => sanitizeSubject(subject, index))
     : [];
 
-  if (subjects.length === 0) {
+  if (rawSubjects.length === 0) {
     throw new Error('Nenhuma disciplina valida foi encontrada na grade enviada.');
   }
 
-  const uniqueTrails = [...new Set(subjects.map((subject) => subject.trail).filter((trail) => trail !== 'Base'))];
-  const fallbackCode = String(parsedCurriculum.code || parsedCurriculum.id || parsedCurriculum.name || 'CURSO').trim().toUpperCase();
-  const id = slugify(parsedCurriculum.id || parsedCurriculum.code || parsedCurriculum.name) || crypto.randomUUID();
+  const subjectIds = new Set(rawSubjects.map((subject) => subject.id));
+  const subjects = rawSubjects.map((subject) => ({
+    ...subject,
+    prerequisites: uniqueList(subject.prerequisites.filter((item) => subjectIds.has(item) && item !== subject.id)),
+    corequisites: uniqueList(subject.corequisites.filter((item) => subjectIds.has(item) && item !== subject.id)),
+  }));
+
+  const catalogName = inferCatalogName(parsedCurriculum);
+  const academicYear = extractAcademicYear(
+    parsedCurriculum.academicYear,
+    parsedCurriculum.versionLabel,
+    parsedCurriculum.name,
+    parsedCurriculum.catalogName,
+    fileName,
+    sourceText.slice(0, 4000),
+  );
+  const versionLabel = inferVersionLabel(parsedCurriculum, academicYear);
+  const baseCode = inferBaseCode(parsedCurriculum, catalogName);
+  const catalogKey = slugify(parsedCurriculum.catalogKey || baseCode || catalogName) || crypto.randomUUID();
+  const idSeed = parsedCurriculum.id
+    || (academicYear ? `${catalogKey}-${academicYear}` : `${catalogKey}-${versionLabel}`);
+  const id = slugify(idSeed) || crypto.randomUUID();
+  const uniqueTrails = uniqueList(subjects.map((subject) => subject.trail).filter((trail) => trail !== 'Base'));
 
   return {
     id,
-    code: fallbackCode.slice(0, 16),
-    name: String(parsedCurriculum.name || parsedCurriculum.code || 'Grade importada').trim(),
+    code: String(parsedCurriculum.code || baseCode || 'CURSO').trim().toUpperCase().slice(0, 16),
+    baseCode,
+    name: catalogName,
+    catalogName,
+    catalogKey,
+    academicYear,
+    versionLabel,
     trailLabels: normalizeList(parsedCurriculum.trailLabels).filter((trail) => trail !== 'Base').length > 0
       ? normalizeList(parsedCurriculum.trailLabels).filter((trail) => trail !== 'Base')
       : uniqueTrails,
@@ -131,7 +410,8 @@ function tryParseDelimited(sourceText) {
   return {
     code: 'IMPORTADA',
     name: 'Grade importada',
-    trailLabels: [...new Set(rows.map((row) => row.trail).filter((trail) => trail && trail !== 'Base'))],
+    academicYear: extractAcademicYear(lines[0]),
+    trailLabels: uniqueList(rows.map((row) => row.trail).filter((trail) => trail && trail !== 'Base')),
     subjects: rows.map((row) => ({
       id: row.id,
       name: row.name,
@@ -143,115 +423,68 @@ function tryParseDelimited(sourceText) {
   };
 }
 
-function extractStructuredText(payload) {
-  if (typeof payload.output_text === 'string' && payload.output_text.trim()) {
-    return payload.output_text;
+async function parseCurriculumSource(
+  {
+    fileData = '',
+    fileName = '',
+    mimeType = '',
+    openaiApiKey = '',
+    openaiModel = DEFAULT_OPENAI_MODEL,
+    sourceText = '',
+  },
+  {
+    docxTextExtractor = extractDocxText,
+    openaiClient = null,
+  } = {},
+) {
+  const extension = getFileExtension(fileName, mimeType);
+  let normalizedSource = String(sourceText || '').trim();
+
+  if (!normalizedSource && DOCX_EXTENSIONS.has(extension)) {
+    normalizedSource = await docxTextExtractor(fileData);
   }
 
-  const outputBlocks = Array.isArray(payload.output) ? payload.output : [];
+  if (!normalizedSource && !fileData) {
+    throw new Error('Envie o conteudo ou o arquivo da grade curricular.');
+  }
 
-  for (const block of outputBlocks) {
-    const contents = Array.isArray(block.content) ? block.content : [];
+  if (normalizedSource && (!extension || TEXT_EXTENSIONS.has(extension) || DOCX_EXTENSIONS.has(extension))) {
+    const jsonPayload = tryParseJson(normalizedSource);
+    if (jsonPayload) {
+      return normalizeCurriculum(jsonPayload, { fileName, sourceText: normalizedSource });
+    }
 
-    for (const content of contents) {
-      if (typeof content.text === 'string' && content.text.trim()) {
-        return content.text;
-      }
+    const delimitedPayload = tryParseDelimited(normalizedSource);
+    if (delimitedPayload) {
+      return normalizeCurriculum(delimitedPayload, { fileName, sourceText: normalizedSource });
     }
   }
 
-  return '';
-}
-
-async function parseWithOpenAI({ sourceText, fileName, openaiApiKey, openaiModel }) {
-  const response = await fetch(OPENAI_RESPONSES_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${openaiApiKey}`,
-    },
-    body: JSON.stringify({
-      model: openaiModel,
-      input: [
-        {
-          role: 'system',
-          content: [
-            {
-              type: 'input_text',
-              text: 'Converta a grade curricular enviada para JSON valido. Preserve codigos, nomes, semestre, trilha, pre-requisitos e correquisitos.',
-            },
-          ],
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'input_text',
-              text: `Arquivo: ${fileName || 'grade.txt'}\n\nConteudo:\n${sourceText}`,
-            },
-          ],
-        },
-      ],
-      text: {
-        format: {
-          type: 'json_schema',
-          name: 'curriculum_import',
-          schema: curriculumSchema,
-          strict: true,
-        },
-      },
-    }),
-  });
-
-  const payload = await response.json();
-
-  if (!response.ok) {
-    throw new Error(payload?.error?.message || 'Falha ao processar a grade com a OpenAI API.');
-  }
-
-  const structuredText = extractStructuredText(payload);
-
-  if (!structuredText) {
-    throw new Error('A OpenAI API nao retornou uma grade estruturada.');
-  }
-
-  return JSON.parse(structuredText);
-}
-
-async function parseCurriculumSource({
-  fileName = '',
-  openaiApiKey = '',
-  openaiModel = 'gpt-4o-mini',
-  sourceText = '',
-}) {
-  const normalizedSource = String(sourceText || '').trim();
-
-  if (!normalizedSource) {
-    throw new Error('Envie o conteudo textual da grade curricular.');
-  }
-
-  const jsonPayload = tryParseJson(normalizedSource);
-  if (jsonPayload) {
-    return normalizeCurriculum(jsonPayload);
-  }
-
-  const delimitedPayload = tryParseDelimited(normalizedSource);
-  if (delimitedPayload) {
-    return normalizeCurriculum(delimitedPayload);
-  }
-
   if (!openaiApiKey) {
-    throw new Error('Configure OPENAI_API_KEY no backend para importar grades nao estruturadas.');
+    throw new Error('Configure OPENAI_API_KEY no backend para importar PDF, DOCX ou grades nao estruturadas.');
+  }
+
+  if (fileData) {
+    const decodedFile = decodeFileData(fileData);
+
+    if (PDF_EXTENSIONS.has(extension) && !decodedFile.mimeType.includes('pdf')) {
+      throw new Error('O arquivo enviado nao parece ser um PDF valido.');
+    }
   }
 
   const aiPayload = await parseWithOpenAI({
-    sourceText: normalizedSource,
+    fileData: PDF_EXTENSIONS.has(extension) ? String(fileData || '').trim() : '',
     fileName,
     openaiApiKey,
+    openaiClient,
     openaiModel,
+    sourceText: normalizedSource,
   });
 
-  return normalizeCurriculum(aiPayload);
+  return normalizeCurriculum(aiPayload, {
+    fileName,
+    sourceText: normalizedSource,
+  });
 }
 
 module.exports = {

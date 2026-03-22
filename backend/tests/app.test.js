@@ -113,6 +113,8 @@ describe('backend app routes', () => {
       id: expect.any(String),
       totalSubjects: expect.any(Number),
     }))
+    expect(health.headers['x-content-type-options']).toBe('nosniff')
+    expect(health.headers['x-frame-options']).toBe('DENY')
   })
 
   it('registra usuario novo e faz login', async () => {
@@ -227,7 +229,9 @@ describe('backend app routes', () => {
         fileName: 'grade-importada.json',
         sourceText: JSON.stringify({
           code: 'ADS',
-          name: 'Analise e Desenvolvimento de Sistemas',
+          name: 'Analise e Desenvolvimento de Sistemas 2025',
+          academicYear: 2025,
+          versionLabel: 'Matriz 2025',
           trailLabels: ['Backend', 'Frontend'],
           subjects: [
             { id: 'ADS101', name: 'Algoritmos', semester: 1, trail: 'Base', prerequisites: [], corequisites: [] },
@@ -238,6 +242,9 @@ describe('backend app routes', () => {
 
     expect(response.status).toBe(201)
     expect(response.body.curriculum.name).toContain('Analise')
+    expect(response.body.curriculum.academicYear).toBe(2025)
+    expect(response.body.curriculum.versionLabel).toBe('Matriz 2025')
     expect(response.body.curriculums.some((curriculum) => curriculum.code === 'ADS')).toBe(true)
+    expect(response.body.curriculums.some((curriculum) => curriculum.catalogKey === 'ads')).toBe(true)
   })
 })

@@ -6,7 +6,18 @@ dotenv.config({
   quiet: process.env.NODE_ENV === 'test',
 });
 
+function parseAllowedOrigins(value) {
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+const appEnv = process.env.APP_ENV || process.env.NODE_ENV || 'development';
+
 module.exports = {
+  appEnv,
+  isProduction: appEnv === 'production',
   port: Number(process.env.PORT || 3001),
   storageDriver: process.env.STORAGE_DRIVER || 'file',
   usersFile: path.resolve(
@@ -20,6 +31,7 @@ module.exports = {
     process.env.IMPORTED_CURRICULUMS_FILE || 'backend/data/imported-curriculums.json',
   ),
   databaseUrl: process.env.DATABASE_URL || '',
+  allowedOrigins: parseAllowedOrigins(process.env.ALLOWED_ORIGINS),
   openaiApiKey: process.env.OPENAI_API_KEY || '',
-  openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  openaiModel: process.env.OPENAI_MODEL || 'gpt-5-mini',
 };

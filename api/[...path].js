@@ -88,7 +88,7 @@ function getRequestBody(req) {
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '8mb',
+      sizeLimit: '20mb',
     },
   },
 };

@@ -27,6 +27,89 @@ export const getSettingsForm = (user, themeOverride = '') => ({
   theme: themeOverride || user?.preferences?.theme || 'brand',
 });
 
+export const getCurriculumCatalogName = (curriculum) => String(
+  curriculum?.catalogName || curriculum?.name || 'Curso',
+).trim() || 'Curso';
+
+export const getCurriculumVersionLabel = (curriculum) => {
+  const explicitLabel = String(curriculum?.versionLabel || '').trim();
+
+  if (explicitLabel) {
+    return explicitLabel;
+  }
+
+  if (curriculum?.academicYear) {
+    return String(curriculum.academicYear);
+  }
+
+  return 'Grade padrao';
+};
+
+export function groupCurriculumsByCatalog(curriculums) {
+  const grouped = new Map();
+  const sortedCurriculums = [...curriculums].sort((first, second) => {
+    const nameCompare = getCurriculumCatalogName(first).localeCompare(getCurriculumCatalogName(second));
+
+    if (nameCompare !== 0) {
+      return nameCompare;
+    }
+
+    const firstYear = first.academicYear || 0;
+    const secondYear = second.academicYear || 0;
+
+    if (firstYear !== secondYear) {
+      return secondYear - firstYear;
+    }
+
+    const versionCompare = getCurriculumVersionLabel(first).localeCompare(getCurriculumVersionLabel(second));
+
+    if (versionCompare !== 0) {
+      return versionCompare;
+    }
+
+    return String(first.id || '').localeCompare(String(second.id || ''));
+  });
+
+  sortedCurriculums.forEach((curriculum) => {
+    const key = String(curriculum.catalogKey || curriculum.id || '');
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        key,
+        code: String(curriculum.baseCode || curriculum.code || '').trim(),
+        name: getCurriculumCatalogName(curriculum),
+        versions: [],
+      });
+    }
+
+    grouped.get(key).versions.push(curriculum);
+  });
+
+  return [...grouped.values()];
+}
+
+export function getFirstCurriculumIdForCatalog(curriculums, catalogKey) {
+  return groupCurriculumsByCatalog(curriculums).find((group) => group.key === catalogKey)?.versions[0]?.id || '';
+}
+
+export function resolveCurriculumId(curriculums, preferredId = '') {
+  if (curriculums.some((curriculum) => curriculum.id === preferredId)) {
+    return preferredId;
+  }
+
+  if (curriculums.length === 0) {
+    return '';
+  }
+
+  const preferredCurriculum = curriculums.find((curriculum) => curriculum.catalogKey === preferredId);
+
+  if (preferredCurriculum) {
+    return preferredCurriculum.id;
+  }
+
+  return groupCurriculumsByCatalog(curriculums)[0]?.versions[0]?.id || curriculums[0].id;
+}
+
 export const normalizeSettingsForCompare = (form) => ({
   name: String(form?.name || '').trim(),
   username: String(form?.username || '').trim(),
