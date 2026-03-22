@@ -35,7 +35,6 @@ const setStoredToken = (token) => token ? window.localStorage.setItem(TOKEN_STOR
 const getStoredTheme = () => window.localStorage.getItem(THEME_STORAGE_KEY) || 'brand';
 const setStoredTheme = (theme) => window.localStorage.setItem(THEME_STORAGE_KEY, theme);
 const shouldUseLocalApiFallback = () => ['localhost', '127.0.0.1'].includes(window.location.hostname);
-const isGitHubPages = () => window.location.hostname.endsWith('github.io');
 const preloadBoardPage = () => {
   if (!boardPagePreloadPromise) {
     boardPagePreloadPromise = loadBoardPage();
@@ -547,12 +546,6 @@ function Dashboard({
     }
 
     const nextPath = page === 'overview' ? '/' : `/${page}`;
-
-    if (isGitHubPages()) {
-      window.location.hash = nextPath;
-      return;
-    }
-
     startTransition(() => navigate(nextPath));
   }
 
