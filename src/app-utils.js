@@ -504,26 +504,26 @@ export function getBoardConnectorPath(edgeOrSource, maybeTarget) {
   const endX = target.x;
   const endY = target.y + (target.height / 2);
   const laneSpread = 14;
-  const corner = 14;
+  const distanceX = endX - startX;
 
   if (type === 'corequisite' && sameColumn) {
-    const laneX = source.x + source.width + 18;
+    const laneX = startX + 18;
     const targetRightX = target.x + target.width;
-    const verticalDirection = endY > startY ? 1 : -1;
-    const beforeTurnY = endY - (corner * verticalDirection);
-    const afterTurnX = targetRightX - corner;
+    const midY = startY + ((endY - startY) / 2);
 
-    return `M ${startX} ${startY} L ${laneX - corner} ${startY} Q ${laneX} ${startY} ${laneX} ${startY + (corner * verticalDirection)} L ${laneX} ${beforeTurnY} Q ${laneX} ${endY} ${afterTurnX} ${endY} L ${targetRightX} ${endY}`;
+    return `M ${startX} ${startY} C ${laneX} ${startY}, ${laneX} ${midY}, ${laneX} ${midY} S ${laneX} ${endY}, ${targetRightX} ${endY}`;
+  }
+
+  if (laneCount <= 1) {
+    const lead = Math.max(26, Math.min(54, distanceX * 0.34));
+
+    return `M ${startX} ${startY} C ${startX + lead} ${startY}, ${endX - lead} ${endY}, ${endX} ${endY}`;
   }
 
   const laneOffset = laneCount > 1 ? ((laneCount - 1 - laneIndex) * laneSpread) : 0;
-  const elbowX = Math.max(startX + 24, endX - 18 - laneOffset);
-  const verticalDirection = endY > startY ? 1 : -1;
-  const beforeTurnX = elbowX - corner;
-  const beforeTurnY = endY - (corner * verticalDirection);
-  const afterTurnX = endX - corner;
+  const laneX = Math.max(startX + 26, endX - 22 - laneOffset);
 
-  return `M ${startX} ${startY} L ${beforeTurnX} ${startY} Q ${elbowX} ${startY} ${elbowX} ${startY + (corner * verticalDirection)} L ${elbowX} ${beforeTurnY} Q ${elbowX} ${endY} ${afterTurnX} ${endY} L ${endX} ${endY}`;
+  return `M ${startX} ${startY} L ${laneX} ${startY} L ${laneX} ${endY} L ${endX} ${endY}`;
 }
 
 export function getInitials(name) {

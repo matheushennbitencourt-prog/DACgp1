@@ -153,7 +153,7 @@ test('board connectors use a more guided curve between cards', () => {
     laneCount: 1,
   });
 
-  assert.match(path, /^M 358 184 L 394 184 Q 408 184 408 198 L 408 280 Q 408 294 412 294 L 426 294$/);
+  assert.match(path, /^M 358 184 C 412 184, 372 294, 426 294$/);
 });
 
 test('board connectors keep same-column corequisites compact', () => {
@@ -163,7 +163,7 @@ test('board connectors keep same-column corequisites compact', () => {
     type: 'corequisite',
   });
 
-  assert.match(path, /^M 1072 192 L 1076 192 Q 1090 192 1090 206 L 1090 383 Q 1090 397 1076 397 L 1072 397$/);
+  assert.match(path, /^M 1072 192 C 1090 192, 1090 294\.5, 1090 294\.5 S 1090 397, 1072 397$/);
 });
 
 test('core calculations stay under the 200 ms target', () => {
