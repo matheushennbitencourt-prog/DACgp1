@@ -610,6 +610,11 @@
   contain: layout paint;
 }
 
+.board-stage {
+  position: relative;
+  min-width: 100%;
+}
+
 .board-column-backdrop {
   position: absolute;
   z-index: 0;
