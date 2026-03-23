@@ -141,6 +141,7 @@
 .soft-button,
 .nav-button,
 .subject-card,
+.board-subject-card,
 .theme-option {
   transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
@@ -597,33 +598,119 @@
 
 .board-scroll {
   overflow: auto;
-  margin: 0 -4px -4px;
-  padding: 4px 4px 10px;
+  margin: 0 -0.25rem -0.25rem;
+  padding: 0.25rem 0.25rem 0.75rem;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
 }
 
-.board-canvas {
-  position: relative;
-  min-width: 100%;
-  contain: layout paint;
+.board-desktop {
+  display: block;
 }
 
-.board-stage {
+.board-shell {
   position: relative;
-  min-width: 100%;
+  width: 100%;
+  max-width: 87.5rem;
+  margin-inline: auto;
+  padding: 0.25rem;
 }
 
-.board-column-backdrop {
-  position: absolute;
-  z-index: 0;
-  border-radius: 24px;
+.board-desktop-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(8.5rem, 10rem) repeat(var(--board-semesters), minmax(0, 1fr));
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.board-corner,
+.board-semester-head,
+.board-trail-head,
+.board-semester-cell {
+  min-width: 0;
+}
+
+.board-corner,
+.board-semester-head {
+  min-height: 3.5rem;
+}
+
+.board-semester-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.board-semester-head span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.board-trail-head {
+  display: flex;
+  align-items: center;
+  min-height: 100%;
+  padding: 0.75rem 0;
+}
+
+.board-trail-head span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 3rem;
+  padding-inline: 0.2rem 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.board-trail-head.trail-desenvolvedor span {
+  color: #53ac59;
+}
+
+.board-trail-head.trail-analista span {
+  color: #5aa2ff;
+}
+
+.board-trail-head.trail-cientista span {
+  color: #d18cff;
+}
+
+.board-trail-head.trail-gestor span {
+  color: #f0b04f;
+}
+
+.board-semester-cell {
+  position: relative;
+  padding: 1rem;
+  border-radius: 1.5rem;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface-subtle) 54%, transparent), color-mix(in srgb, var(--surface-subtle) 34%, transparent));
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-subtle) 58%, transparent), color-mix(in srgb, var(--surface-subtle) 34%, transparent));
   border: 1px solid color-mix(in srgb, var(--border-soft) 44%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, white 26%, transparent);
-  pointer-events: none;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 26%, transparent),
+    var(--shadow);
+  backdrop-filter: blur(14px);
+}
+
+.board-cell-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 100%;
+  justify-content: center;
 }
 
 .board-mobile {
@@ -722,24 +809,16 @@
 
 .board-grid {
   position: absolute;
-  inset: 0;
+  inset: 0.25rem;
   width: 100%;
   height: 100%;
-}
-
-.board-divider {
-  stroke: color-mix(in srgb, var(--border) 82%, transparent);
-  stroke-width: 1;
-}
-
-.board-divider.major {
-  stroke: color-mix(in srgb, var(--text-secondary) 48%, var(--border));
-  stroke-width: 1.2;
+  overflow: visible;
+  pointer-events: none;
 }
 
 .board-edge {
   fill: none;
-  stroke-width: 2.35;
+  stroke-width: 0.18rem;
   stroke-linecap: round;
   stroke-linejoin: round;
   opacity: 0.9;
@@ -752,180 +831,153 @@
 
 .board-edge.corequisite {
   stroke: color-mix(in srgb, var(--text-secondary) 72%, var(--accent));
-  stroke-dasharray: 5 7;
+  stroke-dasharray: 0.38rem 0.52rem;
   opacity: 0.76;
 }
 
-.board-semester-label,
-.board-trail-label {
-  position: absolute;
-  transform: translate(-50%, -50%);
+.board-junction {
+  fill: color-mix(in srgb, var(--surface) 92%, transparent);
+  stroke: color-mix(in srgb, var(--accent) 68%, var(--text-secondary));
+  stroke-width: 0.14rem;
+  filter: drop-shadow(0 0.15rem 0.4rem color-mix(in srgb, var(--accent) 16%, transparent));
+}
+
+.board-subject-card {
+  position: relative;
   z-index: 2;
-  pointer-events: none;
-}
-
-.board-semester-label span {
-  display: inline-flex;
-  padding: 7px 12px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  font-size: 0.8rem;
-  font-weight: 600;
-  box-shadow: var(--shadow);
-}
-
-.board-trail-label {
-  transform: translateY(-50%);
-  width: 134px;
-  left: 0;
-}
-
-.board-trail-label span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  width: 100%;
-  padding: 6px 14px 6px 0;
-  color: var(--text-primary);
-  font-size: 0.88rem;
-  font-weight: 700;
-}
-
-.board-trail-label.trail-desenvolvedor span {
-  color: #53ac59;
-}
-
-.board-trail-label.trail-analista span {
-  color: #5aa2ff;
-}
-
-.board-trail-label.trail-cientista span {
-  color: #d18cff;
-}
-
-.board-trail-label.trail-gestor span {
-  color: #f0b04f;
-}
-
-.board-node {
-  position: absolute;
-  z-index: 3;
   display: grid;
-  grid-template-columns: 34px 1fr;
-  gap: 0;
+  grid-template-columns: 2.15rem minmax(0, 1fr);
+  width: 100%;
+  min-height: 6.75rem;
   padding: 0;
-  border-radius: 18px;
+  border-radius: 1.15rem;
   border: 1px solid var(--border-soft);
   background: color-mix(in srgb, var(--surface) 95%, transparent);
   box-shadow: var(--shadow);
   overflow: hidden;
   touch-action: manipulation;
   backdrop-filter: blur(10px);
+  text-align: left;
 }
 
-.board-node-check {
+.board-subject-card:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.board-subject-card:disabled {
+  cursor: not-allowed;
+}
+
+.board-subject-check {
   position: relative;
   display: block;
   background: color-mix(in srgb, var(--surface-strong) 80%, transparent);
   border-right: 1px solid var(--border-soft);
 }
 
-.board-node-check::after {
+.board-subject-check::after {
   content: '';
   position: absolute;
-  top: 16px;
-  left: 10px;
-  width: 12px;
-  height: 12px;
-  border-radius: 4px;
-  border: 1.5px solid currentColor;
+  top: 1rem;
+  left: 0.625rem;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 0.25rem;
+  border: 0.09375rem solid currentColor;
 }
 
-.board-node-content {
+.board-subject-content {
   display: grid;
-  gap: 6px;
+  gap: 0.375rem;
   align-content: center;
-  padding: 14px;
+  padding: 0.875rem;
   text-align: left;
 }
 
-.board-node-topline {
-  display: grid;
-  gap: 4px;
+.board-subject-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
-.board-node-topline strong {
-  font-size: 0.84rem;
-  line-height: 1.28;
+.board-subject-card strong {
+  font-size: 0.87rem;
+  line-height: 1.35;
   color: var(--text-primary);
 }
 
-.board-node-topline span,
-.board-node-content p {
+.board-subject-trail,
+.board-subject-code,
+.board-subject-content p {
   color: var(--text-secondary);
   font-size: 0.72rem;
 }
 
-.board-node-content p {
+.board-subject-trail,
+.board-subject-code {
+  font-weight: 700;
+}
+
+.board-subject-content p {
   margin: 0;
 }
 
-.board-node.trail-base {
+.board-subject-card.trail-base {
   color: color-mix(in srgb, var(--text-secondary) 88%, var(--text-primary));
 }
 
-.board-node.trail-desenvolvedor {
+.board-subject-card.trail-desenvolvedor {
   color: #53ac59;
 }
 
-.board-node.trail-analista {
+.board-subject-card.trail-analista {
   color: #4f8ff5;
 }
 
-.board-node.trail-cientista {
+.board-subject-card.trail-cientista {
   color: #bd74ff;
 }
 
-.board-node.trail-gestor {
+.board-subject-card.trail-gestor {
   color: #e9a33b;
 }
 
-.board-node.trail-base .board-node-check,
-.board-node.trail-desenvolvedor .board-node-check,
-.board-node.trail-analista .board-node-check,
-.board-node.trail-cientista .board-node-check,
-.board-node.trail-gestor .board-node-check {
+.board-subject-card.trail-base .board-subject-check,
+.board-subject-card.trail-desenvolvedor .board-subject-check,
+.board-subject-card.trail-analista .board-subject-check,
+.board-subject-card.trail-cientista .board-subject-check,
+.board-subject-card.trail-gestor .board-subject-check {
   color: inherit;
 }
 
-.board-node.trail-base {
+.board-subject-card.trail-base {
   border-color: color-mix(in srgb, var(--border) 86%, currentColor);
 }
 
-.board-node.trail-desenvolvedor,
-.board-node.trail-analista,
-.board-node.trail-cientista,
-.board-node.trail-gestor {
+.board-subject-card.trail-desenvolvedor,
+.board-subject-card.trail-analista,
+.board-subject-card.trail-cientista,
+.board-subject-card.trail-gestor {
   border-color: color-mix(in srgb, currentColor 58%, var(--border-soft));
 }
 
-.board-node.status-completed .board-node-check::after {
+.board-subject-card.status-completed .board-subject-check::after {
   background: currentColor;
   box-shadow: inset 0 0 0 2px color-mix(in srgb, currentColor 22%, white);
 }
 
-.board-node.status-locked {
+.board-subject-card.status-locked {
   opacity: 0.82;
 }
 
-.board-node.status-locked .board-node-topline strong,
-.board-node.status-locked .board-node-content p {
+.board-subject-card.status-locked strong,
+.board-subject-card.status-locked .board-subject-content p {
   color: var(--text-secondary);
 }
 
-.board-node.is-critical {
+.board-subject-card.is-critical {
   box-shadow:
     var(--shadow),
     0 0 0 1px color-mix(in srgb, var(--accent-soft) 55%, transparent);
@@ -1196,6 +1248,11 @@
   .sidebar-user-main {
     width: 100%;
   }
+
+  .board-desktop-grid {
+    grid-template-columns: minmax(7.5rem, 9rem) repeat(var(--board-semesters), minmax(12.5rem, 1fr));
+    gap: 0.85rem;
+  }
 }
 
 @media (max-width: 840px) {
@@ -1246,6 +1303,16 @@
   .sidebar-user-main {
     align-items: flex-start;
   }
+
+  .board-desktop-grid {
+    grid-template-columns: minmax(7rem, 8rem) repeat(var(--board-semesters), minmax(11.5rem, 1fr));
+    gap: 0.75rem;
+  }
+
+  .board-semester-cell {
+    padding: 0.85rem;
+    border-radius: 1.25rem;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1271,12 +1338,12 @@
     gap: 12px;
   }
 
-  .board-mobile-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .board-desktop {
+    display: none;
   }
 
-  .board-scroll {
-    display: none;
+  .board-mobile-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .board-mobile-node {

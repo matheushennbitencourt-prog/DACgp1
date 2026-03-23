@@ -240,12 +240,17 @@ function Sidebar({
   selectedCatalogKey,
   onSelectCatalogKey,
   selectedCourseId,
-  setSelectedCourseId,
+  onSelectCourseId,
   curriculumGroups,
   mapData,
   onLogout,
 }) {
-  const selectedGroup = curriculumGroups.find((group) => group.key === selectedCatalogKey) || curriculumGroups[0] || null;
+  const activeCourseId = mapData?.course?.id || selectedCourseId;
+  const activeCatalogKey = mapData?.course?.catalogKey || selectedCatalogKey;
+  const selectedGroup = curriculumGroups.find((group) => group.key === activeCatalogKey)
+    || curriculumGroups.find((group) => group.versions.some((curriculum) => curriculum.id === activeCourseId))
+    || curriculumGroups[0]
+    || null;
 
   return (
     <aside className="sidebar">
@@ -273,11 +278,11 @@ function Sidebar({
       </div>
       <div className="sidebar-block">
         <p className="sidebar-label">Curso</p>
-        <select className="sidebar-select" value={selectedCatalogKey} onChange={(event) => onSelectCatalogKey(event.target.value)}>
+        <select className="sidebar-select" value={selectedGroup?.key || activeCatalogKey} onChange={(event) => onSelectCatalogKey(event.target.value)}>
           {curriculumGroups.map((group) => <option key={group.key} value={group.key}>{group.code ? `${group.code} - ${group.name}` : group.name}</option>)}
         </select>
         <p className="sidebar-label">Versao da grade</p>
-        <select className="sidebar-select" value={selectedCourseId} onChange={(event) => startTransition(() => setSelectedCourseId(event.target.value))}>
+        <select className="sidebar-select" value={activeCourseId} onChange={(event) => onSelectCourseId(event.target.value)}>
           {(selectedGroup?.versions || []).map((curriculum) => (
             <option key={curriculum.id} value={curriculum.id}>
               {getCurriculumVersionLabel(curriculum)}
@@ -625,7 +630,7 @@ function Dashboard({
   const currentPage = pageLabels[routeKey] ? routeKey : 'overview';
   const curriculumGroups = groupCurriculumsByCatalog(curriculums);
   const selectedCurriculum = curriculums.find((item) => item.id === selectedCourseId) || curriculumGroups[0]?.versions?.[0] || null;
-  const selectedCatalogKey = selectedCurriculum?.catalogKey || curriculumGroups[0]?.key || '';
+  const selectedCatalogKey = mapData?.course?.catalogKey || selectedCurriculum?.catalogKey || curriculumGroups[0]?.key || '';
 
   function handleNavigate(page) {
     if (page === 'board') {
@@ -640,6 +645,14 @@ function Dashboard({
     const nextCourseId = getFirstCurriculumIdForCatalog(curriculums, nextCatalogKey);
 
     if (!nextCourseId) {
+      return;
+    }
+
+    startTransition(() => setSelectedCourseId(nextCourseId));
+  }
+
+  function handleSelectCourseId(nextCourseId) {
+    if (!nextCourseId || nextCourseId === selectedCourseId) {
       return;
     }
 
@@ -670,7 +683,7 @@ function Dashboard({
         selectedCatalogKey={selectedCatalogKey}
         onSelectCatalogKey={handleSelectCatalogKey}
         selectedCourseId={selectedCourseId}
-        setSelectedCourseId={setSelectedCourseId}
+        onSelectCourseId={handleSelectCourseId}
         curriculumGroups={curriculumGroups}
         mapData={deferredSidebarMapData}
         onLogout={onLogout}
